@@ -20,7 +20,7 @@
 台本に出てきたものだけ実装するという README 目標1が、そのままタスクの並びになる。
 
 ```
-[  ] フェーズ1  土台と最小パーサ          Task 1-4
+[完了] フェーズ1  土台と最小パーサ          Task 1-4
 [  ] フェーズ2  コアの骨格                Task 5-6
 [  ] フェーズ3  最小UI（ここで動く）      Task 7-8
 [  ] フェーズ4  命令を1つずつ             Task 9-12
@@ -43,6 +43,24 @@
 | 台本の第一原則 | 記法を1つも含まないプレーンテキストは必ずパースが通る |
 | コミット | Conventional Commits（`feat:` / `fix:` / `test:` / `chore:` / `docs:`） |
 | 言語 | エラーメッセージ・コメントは日本語 |
+
+---
+
+## 計画からの逸脱の記録
+
+実装中に計画の記述どおりにいかなかった点。**次に読む人はこちらが正しい。**
+
+| # | 計画の記述 | 実際 | 理由 |
+|---|---|---|---|
+| 1 | Task 1 の依存に `@types/node` がない | 追加し、`tsconfig` の `types` に `"node"` を足した | `tools/` が `node:fs` / `node:crypto` を使う。無いと `vite.config.ts` から型が通らない |
+| 2 | `tsconfig` に `baseUrl: "."` | 削除した | TypeScript 6 で非推奨（TS5101）。`paths` は tsconfig 相対で解決されるため不要 |
+| 3 | `tsconfig` に `allowImportingTsExtensions` がない | 追加した | テストが `../../tools/wn-compile/parse.ts` と拡張子付きで import するため（TS5097） |
+| 4 | `eslint.config.js` に `.mjs` の globals 指定がない | `**/*.mjs` に Node のグローバルを宣言した | `gen-dummy-assets.mjs` が `no-undef` で落ちる。TS ファイルは typescript-eslint が `no-undef` を切るので影響を受けていなかった |
+| 5 | `boot()` は Task 7 まで存在せず、Task 4 の時点で型エラーになる | Task 4 で `src/engine/index.ts` にスタブ（呼ぶと throw）を置いた | 各コミットで `typecheck` を緑に保つため。中身は Task 7 で入れる |
+| 6 | `sample.test.ts` のテスト名が「7シーンになる」 | 「6シーンになる」に直した | 計画本文の数字と、同じテスト内の期待値配列（6要素）が食い違っていた。台本は6シーン |
+
+**採用したツールのバージョン**（計画が書かれた時点より新しい）:
+Vite 8 / TypeScript 6 / ESLint 10 / Vitest 4 / React 19。
 
 ---
 
@@ -207,7 +225,7 @@ architecture.md の `phase` は `performing / typing / waiting` の3つだが、
 **Interfaces:**
 - Produces: `npm test` / `npm run lint` / `npm run typecheck` が動く状態
 
-- [ ] **Step 1: 依存をインストールする**
+- [x] **Step 1: 依存をインストールする**
 
 ```bash
 npm init -y
@@ -217,7 +235,7 @@ npm i -D vite @vitejs/plugin-react typescript vitest \
         eslint @eslint/js typescript-eslint
 ```
 
-- [ ] **Step 2: `package.json` の scripts を書く**
+- [x] **Step 2: `package.json` の scripts を書く**
 
 `npm init -y` が作った内容を、以下で置き換える（`name` と `version` は残す）。
 
@@ -239,7 +257,7 @@ npm i -D vite @vitejs/plugin-react typescript vitest \
 
 `build:all` の `|| exit 1` は、1作品のビルドが失敗したときに残りを走らせず止めるため。
 
-- [ ] **Step 3: `tsconfig.json` を書く**
+- [x] **Step 3: `tsconfig.json` を書く**
 
 ```json
 {
@@ -264,14 +282,14 @@ npm i -D vite @vitejs/plugin-react typescript vitest \
 }
 ```
 
-- [ ] **Step 4: `.gitignore` を書く**
+- [x] **Step 4: `.gitignore` を書く**
 
 ```
 node_modules/
 dist/
 ```
 
-- [ ] **Step 5: `vite.config.ts` を書く**
+- [x] **Step 5: `vite.config.ts` を書く**
 
 ```ts
 import { defineConfig } from 'vite'
@@ -305,7 +323,7 @@ export default defineConfig(() => {
 `wnCompile` はまだ存在しない。Task 4 で作るまでこの行はコメントアウトしておき、
 Task 4 で戻して有効化する。
 
-- [ ] **Step 6: `vitest.config.ts` を書く**
+- [x] **Step 6: `vitest.config.ts` を書く**
 
 `vite.config.ts` は `NOVEL` を要求するため、テストは別 config を使う。
 
@@ -324,7 +342,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 7: `src/engine/wn.d.ts` を書く**
+- [x] **Step 7: `src/engine/wn.d.ts` を書く**
 
 ```ts
 declare module '*.wn' {
@@ -334,7 +352,7 @@ declare module '*.wn' {
 }
 ```
 
-- [ ] **Step 8: `eslint.config.js` で境界を強制する**
+- [x] **Step 8: `eslint.config.js` で境界を強制する**
 
 後の設定オブジェクトが同じルールを上書きするため、`core/` には
 エンジン共通の禁止パターンも**再掲してマージする**。分けて書くと共通分が消える。
@@ -385,7 +403,7 @@ export default tseslint.config(
 )
 ```
 
-- [ ] **Step 9: 境界が実際に効くことを確認する**
+- [x] **Step 9: 境界が実際に効くことを確認する**
 
 一時ファイルを作って lint が落ちることを確かめ、確認できたら消す。
 
@@ -401,7 +419,7 @@ npx eslint src/engine/core/__boundary_check.ts
 rm src/engine/core/__boundary_check.ts
 ```
 
-- [ ] **Step 10: スモークテストを書いて走らせる**
+- [x] **Step 10: スモークテストを書いて走らせる**
 
 ```ts
 // tests/smoke.test.ts
@@ -417,7 +435,7 @@ describe('テスト環境', () => {
 Run: `npm test`
 Expected: PASS（1 test）
 
-- [ ] **Step 11: コミット**
+- [x] **Step 11: コミット**
 
 ```bash
 git add -A
@@ -440,7 +458,7 @@ git commit -m "chore: Vite / TypeScript / Vitest / ESLint の土台を用意す�
 
 **この Task で作るのは「本文とシーンだけを理解するパーサ」。** `@` 命令は Task 3。
 
-- [ ] **Step 1: `src/engine/core/script.ts` に型を書く**
+- [x] **Step 1: `src/engine/core/script.ts` に型を書く**
 
 ```ts
 export type Pos = 'left' | 'center' | 'right'
@@ -473,7 +491,7 @@ export type CompiledScript = {
 
 `i` は**シーン内のローカル連番**。演出 step には振らない。
 
-- [ ] **Step 2: 失敗するテストを書く**
+- [x] **Step 2: 失敗するテストを書く**
 
 ```ts
 // tests/compile/parse.test.ts
@@ -514,12 +532,12 @@ describe('第一原則', () => {
 型を満たすのは Task 4 以降のコンパイラ全体であり、`parse` の戻り値は
 `h` を持たない中間表現とする（Step 3 の `ParseResult` を参照）。
 
-- [ ] **Step 3: 実行して落ちることを確認する**
+- [x] **Step 3: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/compile/parse.test.ts`
 Expected: FAIL（`Cannot find module '../../tools/wn-compile/parse.ts'`）
 
-- [ ] **Step 4: `tools/wn-compile/parse.ts` を書く**
+- [x] **Step 4: `tools/wn-compile/parse.ts` を書く**
 
 ```ts
 import type { Pos, Step } from '../../src/engine/core/script.ts'
@@ -611,12 +629,12 @@ export function parse(source: string, file: string): ParseResult {
 `>` の状態を1ブロックで捨てるために `hasSpeaker` を毎回落とす。
 これが「`>` は直後の1ブロックにのみ効く」の実装。
 
-- [ ] **Step 5: テストが通ることを確認する**
+- [x] **Step 5: テストが通ることを確認する**
 
 Run: `npx vitest run tests/compile/parse.test.ts`
 Expected: PASS（3 tests）
 
-- [ ] **Step 6: シーンと話者のテストを足す**
+- [x] **Step 6: シーンと話者のテストを足す**
 
 ```ts
 describe('シーン宣言', () => {
@@ -648,12 +666,12 @@ describe('話者', () => {
 })
 ```
 
-- [ ] **Step 7: テストを走らせる**
+- [x] **Step 7: テストを走らせる**
 
 Run: `npx vitest run tests/compile/parse.test.ts`
 Expected: PASS（7 tests）
 
-- [ ] **Step 8: コミット**
+- [x] **Step 8: コミット**
 
 ```bash
 git add -A
@@ -672,7 +690,7 @@ git commit -m "feat: 本文・シーン・話者を読む台本パーサを追�
 - Consumes: `parse()`, `WnError`（Task 2）
 - Produces: 10命令すべてが `Step` に変換される
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 import { parse, type RawStep } from '../../tools/wn-compile/parse.ts'
@@ -758,12 +776,12 @@ describe('コンパイルエラー', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/compile/parse.test.ts`
 Expected: FAIL（`@` 行が捨てられているため、`steps()[0]` が text になる）
 
-- [ ] **Step 3: 引数を読むヘルパを書く**
+- [x] **Step 3: 引数を読むヘルパを書く**
 
 `tools/wn-compile/parse.ts` の末尾に足す。
 
@@ -803,7 +821,7 @@ function readPos(a: Args, file: string, line: number): Pos | null {
 }
 ```
 
-- [ ] **Step 4: 命令のディスパッチを書く**
+- [x] **Step 4: 命令のディスパッチを書く**
 
 `parse()` の中の `if (line.startsWith('@'))` ブロックを、以下で置き換える。
 `title` / `protagonist` は `parse()` のローカル変数に代入するため、この処理は
@@ -904,12 +922,12 @@ function readPos(a: Args, file: string, line: number): Pos | null {
 
 `@wait` だけ位置引数がミリ秒なので `readMs` を通さず個別に検証する。
 
-- [ ] **Step 5: テストが通ることを確認する**
+- [x] **Step 5: テストが通ることを確認する**
 
 Run: `npx vitest run tests/compile/parse.test.ts`
 Expected: PASS（20 tests）
 
-- [ ] **Step 6: 実際の台本が通ることを確認する**
+- [x] **Step 6: 実際の台本が通ることを確認する**
 
 ```ts
 // tests/compile/sample.test.ts
@@ -942,7 +960,7 @@ describe('drafts/sample-short.wn', () => {
 Run: `npx vitest run tests/compile/`
 Expected: PASS
 
-- [ ] **Step 7: コミット**
+- [x] **Step 7: コミット**
 
 ```bash
 git add -A
@@ -966,7 +984,7 @@ git commit -m "feat: 10命令のパースとコンパイルエラーを実装す
   - `wnCompile(opts: { root: string }): Plugin`
   - `scanAssets(publicDir: string): Record<string, string>`
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 // tests/compile/compile.test.ts
@@ -1046,12 +1064,12 @@ describe('素材の解決', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/compile/compile.test.ts`
 Expected: FAIL（`tools/wn-compile/index.ts` が無い）
 
-- [ ] **Step 3: `tools/wn-compile/assets.ts` を書く**
+- [x] **Step 3: `tools/wn-compile/assets.ts` を書く**
 
 ```ts
 import { existsSync, readdirSync } from 'node:fs'
@@ -1081,7 +1099,7 @@ export function scanAssets(publicDir: string): Record<string, string> {
 同名で拡張子違いのファイルが両方あった場合は後勝ちになる。台本側は拡張子を書かないため、
 どちらが選ばれるかは不定になる。**素材は1つの名前につき1ファイルだけ置く。**
 
-- [ ] **Step 4: `tools/wn-compile/index.ts` を書く**
+- [x] **Step 4: `tools/wn-compile/index.ts` を書く**
 
 ```ts
 import { createHash } from 'node:crypto'
@@ -1153,12 +1171,12 @@ export function wnCompile(opts: { root: string }): Plugin {
 実行時に不要な情報が全 step に載る。素材名はエラーメッセージに出るため、
 どの行かは検索すれば分かる。**この妥協は意図的なもの。**
 
-- [ ] **Step 5: テストが通ることを確認する**
+- [x] **Step 5: テストが通ることを確認する**
 
 Run: `npx vitest run tests/compile/compile.test.ts`
 Expected: PASS（7 tests）
 
-- [ ] **Step 6: ダミー素材の生成スクリプトを書く**
+- [x] **Step 6: ダミー素材の生成スクリプトを書く**
 
 `novels/kieta-ippen/public/` に、動作確認用の素材を作る。
 背景と立ち絵は SVG（`<img src>` でそのまま表示できる）、
@@ -1245,7 +1263,7 @@ for (const [name, freq] of Object.entries(SE)) {
 console.log(`ダミー素材を ${out} に生成した`)
 ```
 
-- [ ] **Step 7: 1作目のディレクトリを作る**
+- [x] **Step 7: 1作目のディレクトリを作る**
 
 ```bash
 mkdir -p novels/kieta-ippen
@@ -1285,11 +1303,11 @@ boot({
 
 `boot` はまだ存在しない。Task 7 で作るまで型エラーになる。
 
-- [ ] **Step 8: `vite.config.ts` の `wnCompile` を有効化する**
+- [x] **Step 8: `vite.config.ts` の `wnCompile` を有効化する**
 
 Task 1 Step 5 でコメントアウトした import と `plugins` の行を戻す。
 
-- [ ] **Step 9: コンパイルが通ることを確認する**
+- [x] **Step 9: コンパイルが通ることを確認する**
 
 ```bash
 npx vitest run
@@ -1311,7 +1329,7 @@ it('1作目の素材がすべて揃っている', () => {
 })
 ```
 
-- [ ] **Step 10: コミット**
+- [x] **Step 10: コミット**
 
 ```bash
 git add -A
