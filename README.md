@@ -25,7 +25,7 @@
 | ドキュメント | 内容 |
 |---|---|
 | [現在地と残事項](docs/status.md) | 進捗、忘れやすい前提、残タスク |
-| [初期要件と保存設計](docs/specs/2026-08-07-initial-requirements-and-save-design.md) | 確定した要件、セーブ・既読の設計、設計上の不変条件 |
+| [初期要件と保存設計](docs/decisions/2026-08-07-initial-requirements-and-save-design.md) | 確定した要件、セーブ・既読の設計、設計上の不変条件 |
 | [スクリプト構文リファレンス](docs/script-syntax.md) | 台本の記法と命令一覧（暫定） |
 | [ダミー短編の叩き台](drafts/sample-short.wn) | 命令セット抽出のために書いた台本 |
 

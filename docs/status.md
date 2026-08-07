@@ -25,10 +25,10 @@
 
 | ドキュメント | 内容 |
 |---|---|
-| [初期要件と保存設計](specs/2026-08-07-initial-requirements-and-save-design.md) | 確定要件、セーブ・既読の設計、設計上の不変条件、却下した案とその理由 |
+| [初期要件と保存設計](decisions/2026-08-07-initial-requirements-and-save-design.md) | 確定要件、セーブ・既読の設計、設計上の不変条件、却下した案とその理由 |
 | [スクリプト構文リファレンス](script-syntax.md) | 記法と命令一覧（暫定）、運用ルール、実装しないと決めたもの |
 | [ダミー短編](../drafts/sample-short.wn) | 命令セット抽出の根拠となった台本 |
-| [バックログと音声の設計](specs/2026-08-07-backlog-and-audio-design.md) | バックログの範囲、開始フローと音声の解禁、`@bgm` の意味論 |
+| [バックログと音声の設計](decisions/2026-08-07-backlog-and-audio-design.md) | バックログの範囲、開始フローと音声の解禁、`@bgm` の意味論 |
 
 暫定確定した命令は14個。
 

@@ -2,7 +2,7 @@
 
 - 状態: **暫定**。実装前であり、確定していない
 - 根拠: `drafts/sample-short.wn` を書いた結果として抽出したもの
-- 方針: [初期要件と保存設計](specs/2026-08-07-initial-requirements-and-save-design.md) の目標1に従い、
+- 方針: [初期要件と保存設計](decisions/2026-08-07-initial-requirements-and-save-design.md) の目標1に従い、
   **台本に出てこない命令は載せない**
 
 この一覧は「あったら便利そうな機能」ではなく「実際に台本が要求した機能」だけを記録している。
@@ -107,7 +107,7 @@
 | `@protagonist <表示名>` | 主人公のネームプレート表示名 |
 
 `@title` はタイトル画面に表示される。タイトル画面は「はじめから／つづきから」の入口であり、
-同時に音声再生の解禁点でもある（[バックログと音声の設計](specs/2026-08-07-backlog-and-audio-design.md) 参照）。
+同時に音声再生の解禁点でもある（[バックログと音声の設計](decisions/2026-08-07-backlog-and-audio-design.md) 参照）。
 
 ### 背景・音
 
