@@ -35,6 +35,9 @@ web-novel-engine/
 │   │   └── script.ts     コンパイル済み台本の型
 │   └── ui/               ← React。core を購読して描くだけ
 ├── tools/wn-compile/     ← 台本コンパイラ（Vite プラグイン）
+├── tests/                ← src / tools をミラーする
+│   ├── compile/
+│   └── core/
 └── novels/
     └── <作品ID>/
         ├── index.html
@@ -51,11 +54,15 @@ web-novel-engine/
 "scripts": {
   "dev":       "vite",
   "build":     "vite build",
-  "build:all": "for d in novels/*/; do NOVEL=$(basename $d) vite build; done"
+  "build:all": "for d in novels/*/; do NOVEL=$(basename $d) vite build || exit 1; done",
+  "test":      "vitest run",
+  "lint":      "eslint .",
+  "typecheck": "tsc --noEmit"
 }
 ```
 
-環境変数 `NOVEL` で対象作品を選ぶ。
+環境変数 `NOVEL` で対象作品を選ぶ。`build:all` の `|| exit 1` は、
+1作品のビルドが失敗したときに残りを走らせず止めるため。
 
 ```
 NOVEL=novelA npm run dev      # localhost:5173/
@@ -91,13 +98,14 @@ boot({ mount: document.getElementById('app')!, script, novelId: 'novelA' })
 **`novelId` は作品側が明示的に渡す。** ディレクトリ名から自動で拾わない。
 リネームした瞬間にストレージキー `wn:<作品ID>:save:1` が変わり、読者のセーブが消えるため。
 
-素材は作品ごとの `public/` に置き、エンジンが現在のページ URL 基準の相対パスとして解決する。
+素材は作品ごとの `public/` に置く。コンパイラが出した `assets` 表で
+論理名から実パスを引き、現在のページ URL 基準の相対パスとして解決する。
 
 ```ts
-new URL(`bg/${name}.webp`, document.baseURI)
+new URL(script.assets[`bg/${name}`], document.baseURI)
 ```
 
-台本は `@bg rain_street` と書くだけでよく、デプロイ先のパスはエンジンが吸収する。
+台本は `@bg rain_street` と書くだけでよく、拡張子もデプロイ先のパスもエンジンが吸収する。
 
 ## 状態の3層
 
@@ -113,15 +121,19 @@ type EngineState = {
   }
   progress: { scene: string; index: number; pc: number }
   view: {                        // 画面の一時状態。セーブに入らない
-    phase: 'performing' | 'typing' | 'waiting'
+    phase: 'performing' | 'typing' | 'waiting' | 'ended'
     currentText: { speaker: string | null; body: string } | null
     visibleChars: number
+    pageBreaks: number[]         // ページ先頭の文字位置。UI が測定して渡す
     page: { current: number; total: number }
     fadeMs: number
     backlog: BacklogEntry[]
   }
 }
 ```
+
+`phase` の `ended` は台本の終端に到達した状態。これがないと、終端で `waiting` のままになり
+クリックで進めるように見えて何も起きない画面になる。**`ended` はセーブ可能点ではない。**
 
 セーブは `structuredClone(state.snapshot)` の一行になる。
 これにより「スナップショット対象のフィールド一覧」がコード上に二度現れなくなり、
@@ -144,6 +156,18 @@ const state = useSyncExternalStore(runtime.subscribe, runtime.getState)
 音声はコアの `audio.ts` が Web Audio を直接持ち、React は触らない。
 unlock はタイトル画面のボタンハンドラから同期的に `runtime.unlockAudio()` を呼ぶ
 （`await` を挟むとジェスチャ資格が切れるため）。
+
+### ページ分割の測定は UI の責務
+
+コアは DOM を触れないため、テキスト測定は UI 層が行う。
+UI が Range API で「枠に収まる文字数」を測り、境界を数値の配列でコアに渡す。
+
+```ts
+runtime.setPageBreaks(breaks: number[])   // [0, 42, 87] のような文字位置
+```
+
+コアは現在ページの文字範囲だけを文字送りの対象にする。
+受け取るのが数値の配列だけなので React / DOM 非依存は保たれ、テストでは境界を直接渡せる。
 
 ## 演出時間はコアが持ち、CSS に渡す
 
@@ -192,8 +216,34 @@ import script from './script.wn'   // 型は CompiledScript
 |---|---|
 | パース | 行頭記号で分類。本文がデフォルト分類であり、失敗が存在しない |
 | 既読ハッシュ | `シーン名 \n 話者名 \n 本文` を SHA-256、先頭12桁を `h` に埋める |
-| 素材の解決 | `public/<種別>/<名前>.*` を探し、見つかったパスを `src` に埋める |
+| 素材の解決 | `public/` をスキャンし、論理名 → 実パスの表を `assets` に出す（下記） |
 | 検証 | 未知の命令、引数の不足・型違い、シーン名の重複をビルドエラーにする |
+
+### 素材の解決
+
+**パスを step に埋め込まず、論理名 → 実パスの表を1つ出して実行時に引く。**
+
+```json
+"assets": {
+  "bg/clubroom_day":   "bg/clubroom_day.svg",
+  "chara/mika_normal": "chara/mika_normal.svg",
+  "bgm/daily":         "bgm/daily.wav"
+}
+```
+
+step に埋め込む方式は**立ち絵で成立しない。** `@show mika smile` は表情を省略できる仕様
+（`@show mika pos:left` は表情を維持する）であり、その時点の表情はビルド時に確定しない。
+静的な追跡はできるが、分岐が入ると到達経路が一意でなくなる
+（engine-spec がスナップショットの静的計算を却下したのと同じ壁）。
+
+存在チェックは**台本に書かれた引数**に対して行う。表情を省略した `@show` はチェックできないため、
+実行時に表が引けなければ `console.warn` して立ち絵を出さない。
+
+素材は1つの名前につき1ファイルだけ置く。同名で拡張子違いがあると、
+台本側は拡張子を書かないためどちらが選ばれるか不定になる。
+
+**これはプリロード用マニフェストではない。** 出力しないと決めたのは
+シーンごとの使用素材一覧であり、パス解決表とは別物。プリロードは未着手のまま。
 
 **パースエラーは `@` で始まる行にしか発生しない。** 記法を1つも使わない原稿は
 全行が本文になって必ず通る（台本フォーマットの第一原則）。
@@ -238,6 +288,10 @@ ESLint の `no-restricted-imports` で機械的に落とす。
 
 コアが React にも DOM にも依存しないため、Vitest で jsdom なしにテストできる。
 engine-spec の不変条件が、そのままテストケースの一覧になる。
+
+テストは `tests/` にソースをミラーして置く（`tests/compile/parse.test.ts` など）。
+`vite.config.ts` が環境変数 `NOVEL` を要求するため、**config は `vitest.config.ts` に分ける。**
+`NOVEL` を指定しないとテストが走らない状態を避けるため。
 
 | テスト | 内容 |
 |---|---|
