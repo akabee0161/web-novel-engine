@@ -21,8 +21,8 @@
 
 ```
 [完了] フェーズ1  土台と最小パーサ          Task 1-4
-[  ] フェーズ2  コアの骨格                Task 5-6
-[  ] フェーズ3  最小UI（ここで動く）      Task 7-8
+[完了] フェーズ2  コアの骨格                Task 5-6
+[完了] フェーズ3  最小UI（ここで動く）      Task 7-8
 [  ] フェーズ4  命令を1つずつ             Task 9-12
 [  ] フェーズ5  既読・バックログ・セーブ  Task 13-16
 [  ] フェーズ6  ページ送りと仕上げ        Task 17-18
@@ -58,6 +58,7 @@
 | 4 | `eslint.config.js` に `.mjs` の globals 指定がない | `**/*.mjs` に Node のグローバルを宣言した | `gen-dummy-assets.mjs` が `no-undef` で落ちる。TS ファイルは typescript-eslint が `no-undef` を切るので影響を受けていなかった |
 | 5 | `boot()` は Task 7 まで存在せず、Task 4 の時点で型エラーになる | Task 4 で `src/engine/index.ts` にスタブ（呼ぶと throw）を置いた | 各コミットで `typecheck` を緑に保つため。中身は Task 7 で入れる |
 | 6 | `sample.test.ts` のテスト名が「7シーンになる」 | 「6シーンになる」に直した | 計画本文の数字と、同じテスト内の期待値配列（6要素）が食い違っていた。台本は6シーン |
+| 7 | Task 7 / 8 の「実機で確認する」が手動前提 | Playwright で自動確認した | 確認項目がすべて DOM から取れる。スクリプトは残していない（scratchpad で実行しただけ） |
 
 **採用したツールのバージョン**（計画が書かれた時点より新しい）:
 Vite 8 / TypeScript 6 / ESLint 10 / Vitest 4 / React 19。
@@ -1449,12 +1450,12 @@ export function initialState(sceneId: string): EngineState {
 **新しい状態を足すときは、必ずどの層に置くかを選ぶこと**（engine-spec 不変条件4）。
 画面の見た目を決めて、シーンをまたいで持ち越されるなら `snapshot`。そうでなければ `view`。
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/state.test.ts`
 Expected: PASS（2 tests）
 
-- [ ] **Step 5: コミット**
+- [x] **Step 5: コミット**
 
 ```bash
 git add -A
@@ -1484,7 +1485,7 @@ git commit -m "feat: EngineState の3層を定義する"
 **この Task の範囲は本文（`text`）と進行だけ。** 演出命令は Task 9 以降で1つずつ足す。
 未実装の step は無視して次に進む。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 // tests/core/runtime.test.ts
@@ -1594,12 +1595,12 @@ describe('素材パスの解決', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/core/runtime.test.ts`
 Expected: FAIL（モジュールが無い）
 
-- [ ] **Step 3: `src/engine/core/runtime.ts` を書く**
+- [x] **Step 3: `src/engine/core/runtime.ts` を書く**
 
 ```ts
 import type { CompiledScript, Step } from './script.ts'
@@ -1753,12 +1754,12 @@ export class Runtime {
 これにより「リプレイ ＝ 待ち時間ゼロの通常再生」が `if (this.replaying) return` の2行で成立し、
 step の実行コードにリプレイの分岐が1つも入らない。
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/runtime.test.ts`
 Expected: PASS（9 tests）
 
-- [ ] **Step 5: コミット**
+- [x] **Step 5: コミット**
 
 ```bash
 git add -A
@@ -1787,7 +1788,7 @@ git commit -m "feat: 本文の実行と進行を行う Runtime を追加する"
 **このタスクの完了時点で、はじめて画面が動く。**
 タイトル → クリック → 本文が出る → クリックで進む、が通る。
 
-- [ ] **Step 1: `src/engine/ui/useEngine.ts` を書く**
+- [x] **Step 1: `src/engine/ui/useEngine.ts` を書く**
 
 ```ts
 import { useSyncExternalStore } from 'react'
@@ -1801,7 +1802,7 @@ export function useEngine(runtime: Runtime): EngineState {
 
 第3引数（サーバ用スナップショット）は SSR しないので `getState` をそのまま渡す。
 
-- [ ] **Step 2: `src/engine/ui/style.css` を書く**
+- [x] **Step 2: `src/engine/ui/style.css` を書く**
 
 ```css
 :root { color-scheme: dark; }
@@ -1876,7 +1877,7 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
 }
 ```
 
-- [ ] **Step 3: `src/engine/ui/Title.tsx` を書く**
+- [x] **Step 3: `src/engine/ui/Title.tsx` を書く**
 
 ```tsx
 type Props = {
@@ -1900,7 +1901,7 @@ export function Title({ title, onStart }: Props) {
 
 「つづきから」は Task 15（セーブ）で有効化する。
 
-- [ ] **Step 4: `src/engine/ui/MessageBox.tsx` を書く**
+- [x] **Step 4: `src/engine/ui/MessageBox.tsx` を書く**
 
 ```tsx
 import type { CompiledScript } from '../core/script.ts'
@@ -1932,7 +1933,7 @@ export function MessageBox({ state, script }: Props) {
 「`「…」` は `@protagonist` の名前、記号なしの行はネームプレートを出さない」を実装している。
 `「` は制御文字ではないので、行頭が `「` かどうかだけを見る。
 
-- [ ] **Step 5: `src/engine/ui/App.tsx` を書く**
+- [x] **Step 5: `src/engine/ui/App.tsx` を書く**
 
 ```tsx
 import { useState } from 'react'
@@ -1963,7 +1964,7 @@ export function App({ runtime }: { runtime: Runtime }) {
 }
 ```
 
-- [ ] **Step 6: `src/engine/ui/boot.tsx` と `src/engine/index.ts` を書く**
+- [x] **Step 6: `src/engine/ui/boot.tsx` と `src/engine/index.ts` を書く**
 
 ```tsx
 // src/engine/ui/boot.tsx
@@ -2000,7 +2001,7 @@ export type { CompiledScript } from './core/script.ts'
 **`index.ts` から export するのはこれだけ。** ここが作品の触ってよい唯一の面であり、
 増やすときは「作品側が本当に必要か」を必ず問う。
 
-- [ ] **Step 7: 実際に起動して確認する**
+- [x] **Step 7: 実際に起動して確認する**
 
 ```bash
 NOVEL=kieta-ippen npm run dev
@@ -2016,12 +2017,12 @@ NOVEL=kieta-ippen npm run dev
 6. 地の文にネームプレートが出ない
 7. ウィンドウを縦長・横長にしても 16:9 が保たれ、レターボックスになる
 
-- [ ] **Step 8: 型チェックと lint を通す**
+- [x] **Step 8: 型チェックと lint を通す**
 
 Run: `npm run typecheck && npm run lint && npm test`
 Expected: すべて PASS
 
-- [ ] **Step 9: コミット**
+- [x] **Step 9: コミット**
 
 ```bash
 git add -A
@@ -2046,7 +2047,7 @@ git commit -m "feat: タイトル画面と本編画面を追加し、台本が�
   - `runtime.setSettings(s: Settings): void`
   - `runtime.advance()` が文字送り中なら全文を即座に表示する
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 // tests/core/typing.test.ts
@@ -2120,12 +2121,12 @@ describe('文字送りの進行', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/core/typing.test.ts`
 Expected: FAIL（`core/settings.ts` が無い）
 
-- [ ] **Step 3: `src/engine/core/settings.ts` を書く**
+- [x] **Step 3: `src/engine/core/settings.ts` を書く**
 
 ```ts
 export type Settings = {
@@ -2153,7 +2154,7 @@ export function charDelayMs(settings: Settings, scriptSpeed: 'slow' | 'normal'):
 }
 ```
 
-- [ ] **Step 4: `Runtime` に文字送りを足す**
+- [x] **Step 4: `Runtime` に文字送りを足す**
 
 `runtime.ts` に以下を加える。
 
@@ -2240,7 +2241,7 @@ import { DEFAULT_SETTINGS, charDelayMs, type Settings } from './settings.ts'
   }
 ```
 
-- [ ] **Step 5: テストが通ることを確認する**
+- [x] **Step 5: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/`
 Expected: PASS（全テスト）
@@ -2248,7 +2249,7 @@ Expected: PASS（全テスト）
 Task 6 のテストのうち、一括表示を前提にしていたものが落ちる場合は
 `r.setSettings({ ...DEFAULT_SETTINGS, textMode: 'instant' })` を足して直す。
 
-- [ ] **Step 6: 実機で確認する**
+- [x] **Step 6: 実機で確認する**
 
 ```bash
 NOVEL=kieta-ippen npm run dev
@@ -2258,7 +2259,7 @@ NOVEL=kieta-ippen npm run dev
 2. 表示途中でクリックすると全文が出て、そこで止まる
 3. もう一度クリックすると次の本文に進む
 
-- [ ] **Step 7: コミット**
+- [x] **Step 7: コミット**
 
 ```bash
 git add -A

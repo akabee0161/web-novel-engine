@@ -1,4 +1,5 @@
 import type { CompiledScript, Step } from './script.ts'
+import { DEFAULT_SETTINGS, charDelayMs, type Settings } from './settings.ts'
 import { initialState, type EngineState, type Snapshot } from './state.ts'
 
 export type RuntimeOptions = {
@@ -21,6 +22,9 @@ export class Runtime {
   private state: EngineState
   private listeners = new Set<() => void>()
   private clickResolve: (() => void) | null = null
+  private settings: Settings = DEFAULT_SETTINGS
+  /** 文字送りを打ち切って全文表示するためのフラグ */
+  private skipTyping = false
 
   /** リプレイ中は待ち時間を一切消費しない */
   protected replaying = false
@@ -58,6 +62,14 @@ export class Runtime {
       view: { ...this.state.view },
     }
     for (const fn of this.listeners) fn()
+  }
+
+  setSettings(s: Settings): void {
+    this.settings = s
+  }
+
+  getSettings(): Settings {
+    return this.settings
   }
 
   resolveAsset(key: string): string | null {
@@ -107,10 +119,38 @@ export class Runtime {
   private async execText(step: Extract<Step, { t: 'text' }>): Promise<void> {
     this.state.progress.index = step.i
     this.state.view.currentText = { speaker: step.speaker, body: step.body }
-    this.state.view.visibleChars = step.body.length
-    this.state.view.phase = 'typing'
+    this.state.view.visibleChars = 0
     this.emit()
+    await this.type(step.body)
     await this.waitForClick()
+  }
+
+  /**
+   * 1文字ずつ visibleChars を進める。
+   * リプレイ中と一括表示のときは即座に全文表示になる。
+   */
+  private async type(body: string): Promise<void> {
+    const delay = charDelayMs(this.settings, this.state.snapshot.speed)
+    if (this.replaying || delay === 0) {
+      this.state.view.visibleChars = body.length
+      this.emit()
+      return
+    }
+
+    this.state.view.phase = 'typing'
+    this.state.view.visibleChars = 0
+    this.skipTyping = false
+    this.emit()
+
+    for (let n = 1; n <= body.length; n++) {
+      await sleep(delay)
+      if (this.skipTyping) break
+      this.state.view.visibleChars = n
+      this.emit()
+    }
+
+    this.state.view.visibleChars = body.length
+    this.emit()
   }
 
   /**
@@ -143,6 +183,11 @@ export class Runtime {
 
   /** 読者のクリック */
   advance(): void {
+    // 文字送り中のクリックは、全文を表示して止める（次には進まない）
+    if (this.state.view.phase === 'typing') {
+      this.skipTyping = true
+      return
+    }
     if (this.state.view.phase !== 'waiting') return
     const resolve = this.clickResolve
     this.clickResolve = null
