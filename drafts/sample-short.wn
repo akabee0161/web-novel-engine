@@ -15,6 +15,13 @@
 #   記号なしの行   地の文・主人公のモノローグ（ネームプレートなし）
 #   「…」          主人公の発話（@protagonist の名前が出る）
 #   > の直後の「…」 その名前の人物の発話
+#
+# 本文ブロック
+#   改行が区切り。1行＝1ブロック＝クリック1回。空行は無視される。
+#
+# 状態
+#   背景・BGM・立ち絵はシーンをまたいで持ち越される。
+#   消したいときは明示的に @hide する。
 # ============================================================
 
 @title 消えた一篇
@@ -45,13 +52,14 @@
 >ミカ
 「地味って言うな。落ち着いてるって言え」
 
-@show mika smile pos:center
+@show mika smile
 
 彼女は笑って、束を机に戻した。
 
 @se door_open
+@wait 300
 @show tooru normal pos:right
-@move mika pos:left
+@show mika pos:left
 
 >トオル
 「まだいたんだ」
@@ -62,15 +70,13 @@
 >トオル
 「覚えてるよ。ちゃんと来ただろ」
 
-@wait 400
-
 >トオル
 「……で、何をすればいい?」
 
 >ミカ
 「もう終わった」
 
-@show tooru surprised pos:right
+@show tooru surprised
 
 >トオル
 「終わったの?」
@@ -78,7 +84,7 @@
 >ミカ
 「うん」
 
-@show mika smile pos:left
+@show mika smile
 
 ミカは「うん」とだけ言って、椅子に座り直した。
 
@@ -86,14 +92,13 @@
 = scene 部室・違和感
 
 # ここから空気が変わる。BGM を落として地の文だけの時間を作る。
+# 背景と立ち絵は持ち越されるので、変える表情だけ書く。
 
 @bgm stop fade:1200
-@show mika normal pos:left
-@show tooru normal pos:right
+@show mika normal
+@show tooru normal
 
 何気なく手に取った一冊を、目次から開いた。
-
-@wait 600
 
 一篇、足りない。
 
@@ -110,7 +115,7 @@
 
 「『白線』が入ってない」
 
-@show mika surprised pos:left
+@show mika surprised
 
 >ミカ
 「え」
@@ -133,9 +138,7 @@
 >ミカ
 「わたし、目次と本文を突き合わせてる。五番目は……」
 
-@wait 500
-
-@show mika think pos:left
+@show mika think
 
 >ミカ
 「五番目は、なんだっけ」
@@ -146,8 +149,6 @@
 >ミカ
 「うん。うん、そうなんだけど」
 
-@wait 400
-
 >ミカ
 「誰が書いたか、思い出せない」
 
@@ -155,8 +156,7 @@
 = scene 廊下
 
 @bg corridor_evening fade:800
-@hide mika
-@hide tooru
+@hide *
 
 窓の外はもう暗い。廊下の蛍光灯が一本だけ切れかけていて、一定の間隔で瞬いている。
 
@@ -174,12 +174,10 @@
 >トオル
 「……なあ」
 
-@show tooru think pos:center
+@show tooru think
 
 >トオル
 「『白線』って、どんな話だっけ」
-
-@wait 700
 
 答えようとして、口が止まった。
 
@@ -195,6 +193,7 @@
 @bg clubroom_day
 @flashback on
 @bgm memory
+@hide *
 
 ──昨日。
 
@@ -207,11 +206,7 @@
 
 一つずつ、題を読み上げていった記憶がある。
 
-@wait 500
-
 五番目の束を持ち上げたとき、ミカが何か言った。
-
-@wait 800
 
 何を言ったか、思い出せない。
 
@@ -222,9 +217,8 @@
 
 @bg rooftop_door fade:600
 @bgm stop fade:800
-@hide mika
+@show mika pos:left
 @show tooru normal pos:right
-@show mika normal pos:left
 
 階段を上がりきったところに、ミカが座っていた。
 
@@ -237,9 +231,7 @@
 >ミカ
 「六篇しか入ってなかった」
 
-@wait 600
-
-@show mika sad pos:left
+@show mika sad
 
 >ミカ
 「最初から、六篇だったって」
@@ -254,7 +246,7 @@
 >ミカ
 「うん」
 
-@show mika normal pos:left
+@show mika normal
 
 >ミカ
 「あるんだよね」
@@ -270,16 +262,11 @@
 
 @bg black fade:1500
 @bgm stop
-@hide mika
-@hide tooru
-
-@wait 1000
+@hide *
 
 その夜、家に帰ってから、自分の本棚を確認した。
 
 去年の部誌。一昨年の部誌。
-
-@wait 600
 
 どれにも、『白線』という題があった。
 
@@ -289,14 +276,11 @@
 
 @speed normal
 
-@wait 800
+# 叙述トリック用。話者を実名ではなく表示名で書く。
+# 効果音を鳴らしてから間を置き、声が来る。
 
 @se phone
-
-# 叙述トリック用。話者を実名ではなく表示名で書く。
-@bgm stop
+@wait 600
 
 >？？？
 「読んでくれた?」
-
-@wait 1200
