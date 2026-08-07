@@ -33,6 +33,13 @@ export default tseslint.config(
       }],
     },
   },
+  // 素の .mjs は TS の型情報を持たないため、Node のグローバルを明示する
+  {
+    files: ['**/*.mjs'],
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly' },
+    },
+  },
   {
     files: ['novels/**/*.{ts,tsx}'],
     rules: {

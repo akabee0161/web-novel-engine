@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { compile } from '../../tools/wn-compile/index.ts'
 import { parse } from '../../tools/wn-compile/parse.ts'
 
 describe('drafts/sample-short.wn', () => {
@@ -20,5 +22,11 @@ describe('drafts/sample-short.wn', () => {
       const ids = scene.steps.filter((s) => s.t === 'text').map((s) => s.i)
       expect(ids).toEqual(ids.map((_, k) => k))
     }
+  })
+
+  it('1作目の素材がすべて揃っている', () => {
+    const script = readFileSync(new URL('../../novels/kieta-ippen/script.wn', import.meta.url), 'utf8')
+    const pub = fileURLToPath(new URL('../../novels/kieta-ippen/public', import.meta.url))
+    expect(() => compile(script, 'script.wn', pub)).not.toThrow()
   })
 })

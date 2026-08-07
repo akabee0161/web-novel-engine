@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
-// import { wnCompile } from './tools/wn-compile/index.ts'   // Task 4 で有効化する
+import { wnCompile } from './tools/wn-compile/index.ts'
 
 export default defineConfig(() => {
   const novel = process.env.NOVEL
@@ -21,6 +21,6 @@ export default defineConfig(() => {
     resolve: {
       alias: { '@engine': resolve(import.meta.dirname, 'src/engine/index.ts') },
     },
-    plugins: [react() /* , wnCompile({ root }) */],
+    plugins: [react(), wnCompile({ root })],
   }
 })
