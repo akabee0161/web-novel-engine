@@ -23,7 +23,7 @@
 [完了] フェーズ1  土台と最小パーサ          Task 1-4
 [完了] フェーズ2  コアの骨格                Task 5-6
 [完了] フェーズ3  最小UI（ここで動く）      Task 7-8
-[途中] フェーズ4  命令を1つずつ           Task 9-11 完了 / 12
+[完了] フェーズ4  命令を1つずつ           Task 9-12
 [  ] フェーズ5  既読・バックログ・セーブ  Task 13-16
 [  ] フェーズ6  ページ送りと仕上げ        Task 17-18
 ```
@@ -68,6 +68,8 @@
 | 14 | Task 11 Step 1 の2件が空振りで通る | 待ち合わせを `phase === 'performing'` から `view.fadeMs` に変えた | `initialState` の `phase` が `performing` なので、待ちに入る前でも条件が成立してしまう |
 | 15 | Task 9 で足した E2E「フェード中はクリックしても進まない」 | 「演出中のクリックは待ちを打ち切るだけで、本文は飛ばさない」に書き換えた | Task 11 で仕様が変わった。打ち切りの時間的な検証は core のテストが持つ |
 | 16 | Task 11 Step 7「実機で確認する」が手動前提 | Playwright に1件足した（`@flashback` の区間） | 逸脱10 と同じ。`@speed` / `@wait` は時間の検証なので core 側に置いた |
+| 17 | Task 12 Step 8「実機で確認する」が手動前提 | Playwright に1件足した。`AudioContext` の生成回数と `decodeAudioData` の回数を計測し、通し読みで警告が出ないことを見る | 逸脱10 と同じ。**鳴っているかどうかは検証できない**ので、解禁の起点（タイトル画面のクリック）と素材のデコード成功までを固定した。iOS Safari での実聴は未実施 |
+| 18 | Task 12 Step 3/4 の `exec` に `default` 節あり | `default` を削除した | 10命令すべてが揃い、`switch` が網羅的になったため |
 
 **フェーズ3 完了後に確定した仕様**（Task 10 / 11 / 14 に申し送り済み）:
 演出中のクリックは現在の待ちだけ打ち切る（**Task 11 で実装済み**）／
@@ -2844,7 +2846,7 @@ git commit -m "feat: @wait / @speed / @flashback を実装する"
 **`<audio>` 要素は使わない。** iOS Safari が `HTMLMediaElement.volume` を無視するため、
 `@bgm stop fade:800` が実装できない。GainNode なら確実にフェードできる。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 // tests/core/audio.test.ts
@@ -2915,12 +2917,12 @@ describe('@bgm の意味論', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/core/audio.test.ts`
 Expected: FAIL（`core/audio.ts` が無い）
 
-- [ ] **Step 3: `src/engine/core/audio.ts` を書く**
+- [x] **Step 3: `src/engine/core/audio.ts` を書く**
 
 ```ts
 export type Volumes = { master: number; bgm: number; se: number }
@@ -3092,7 +3094,7 @@ export class WebAudio implements AudioPort {
 「resume してから素材をロード」の順になる。`startBgm` が `await` の後に
 `this.current !== name` を確かめているのはそのため。
 
-- [ ] **Step 4: `Runtime` に音声を接続する**
+- [x] **Step 4: `Runtime` に音声を接続する**
 
 `RuntimeOptions` に足す。
 
@@ -3157,12 +3159,12 @@ export class WebAudio implements AudioPort {
   }
 ```
 
-- [ ] **Step 5: テストが通ることを確認する**
+- [x] **Step 5: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/audio.test.ts`
 Expected: PASS（5 tests）
 
-- [ ] **Step 6: `boot.tsx` で `WebAudio` を注入する**
+- [x] **Step 6: `boot.tsx` で `WebAudio` を注入する**
 
 `WebAudio` は `Runtime` のコンストラクタ引数なので、`runtime.resolveAsset` を
 そのまま渡すことはできない（その時点で `Runtime` はまだ存在しない）。
@@ -3187,7 +3189,7 @@ export function boot(opts: BootOptions): void {
 }
 ```
 
-- [ ] **Step 7: `App.tsx` で unlock とバックグラウンド復帰を繋ぐ**
+- [x] **Step 7: `App.tsx` で unlock とバックグラウンド復帰を繋ぐ**
 
 ```tsx
   const start = () => {
@@ -3212,7 +3214,7 @@ export function boot(opts: BootOptions): void {
 
 `resume()` は冪等なので、両方走っても害はない。
 
-- [ ] **Step 8: 実機で確認する**
+- [x] **Step 8: 実機で確認する**
 
 ```bash
 NOVEL=kieta-ippen npm run dev
@@ -3227,7 +3229,7 @@ NOVEL=kieta-ippen npm run dev
 
 可能なら iOS Safari でも確認する（タイトル画面を経由すれば鳴ること）。
 
-- [ ] **Step 9: コミット**
+- [x] **Step 9: コミット**
 
 ```bash
 git add -A

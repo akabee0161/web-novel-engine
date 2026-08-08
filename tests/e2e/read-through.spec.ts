@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test'
 
+declare global {
+  interface Window {
+    /** 音声の解禁を数えるための計測用。addInitScript が仕込む */
+    __audioContexts?: number
+    /** 実際にデコードした音声素材の数。0 なら検証が空振りしている */
+    __decodedAudio?: number
+  }
+}
+
 const FIRST_BODY = '放課後の部室は、いつも通り紙の匂いがした。'
 const LAST_BODY = '「読んでくれた?」'
 /** drafts/sample-short.wn の本文ブロック数 */
@@ -181,6 +190,43 @@ test('@flashback on / off の区間だけ回想の画面効果がかかる', asy
   expect(blocks[on.at(-1)! + 1].flashback).toBe(false)
   // 回想は背景を持ち越した clubroom_day で起きる
   expect(blocks[on[0]].bg).toBe('clubroom_day')
+})
+
+test('音声はタイトル画面のクリックで解禁され、台本の素材が読み込める', async ({ page }) => {
+  const warnings: string[] = []
+  page.on('console', (m) => m.type() === 'warning' && warnings.push(m.text()))
+
+  await page.addInitScript(() => {
+    window.__audioContexts = 0
+    window.__decodedAudio = 0
+    const Original = window.AudioContext
+    window.AudioContext = class extends Original {
+      constructor(options?: AudioContextOptions) {
+        super(options)
+        window.__audioContexts = (window.__audioContexts ?? 0) + 1
+      }
+    }
+    const decode = Original.prototype.decodeAudioData
+    Original.prototype.decodeAudioData = function (this: BaseAudioContext, data: ArrayBuffer) {
+      window.__decodedAudio = (window.__decodedAudio ?? 0) + 1
+      return decode.call(this, data)
+    }
+  })
+
+  await page.goto('/')
+  // タイトル画面を出しただけでは AudioContext を作らない
+  expect(await page.evaluate(() => window.__audioContexts)).toBe(0)
+
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  expect(await page.evaluate(() => window.__audioContexts)).toBe(1)
+
+  // 通しで読んでも、BGM / SE の読み込みが1つも失敗しない
+  // （失敗すると audio.ts が console.warn する）
+  const blocks = await readAll(page)
+  expect(blocks).toHaveLength(TOTAL_BLOCKS)
+  expect(warnings).toEqual([])
+  // 台本には BGM 3種と SE 4種が出てくる。バッファは名前ごとに1回だけデコードされる
+  expect(await page.evaluate(() => window.__decodedAudio)).toBe(7)
 })
 
 test('演出中のクリックは待ちを打ち切るだけで、本文は飛ばさない', async ({ page }) => {

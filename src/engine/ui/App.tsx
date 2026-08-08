@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Runtime } from '../core/runtime.ts'
 import { MessageBox } from './MessageBox.tsx'
 import { Stage } from './Stage.tsx'
@@ -11,9 +11,20 @@ export function App({ runtime }: { runtime: Runtime }) {
   const state = useEngine(runtime)
 
   const start = () => {
+    // await を挟まず同期的に呼ぶ。挟むとユーザージェスチャの資格が切れる
+    runtime.unlockAudio()
     setStarted(true)
     void runtime.start()
   }
+
+  // タブ復帰や画面ロック明けに AudioContext が suspended へ落ちる
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') runtime.resumeAudio()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [runtime])
 
   return (
     <div className="wn-viewport">
@@ -21,7 +32,11 @@ export function App({ runtime }: { runtime: Runtime }) {
       <div
         className="wn-stage"
         data-phase={state.view.phase}
-        onClick={() => started && runtime.advance()}
+        // resume() は冪等なので、visibilitychange と両方走っても害はない
+        onClick={() => {
+          runtime.resumeAudio()
+          if (started) runtime.advance()
+        }}
       >
         {started ? (
           <>

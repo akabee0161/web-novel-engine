@@ -1,3 +1,4 @@
+import { nullAudio, type AudioPort } from './audio.ts'
 import type { CompiledScript, Step } from './script.ts'
 import { DEFAULT_SETTINGS, charDelayMs, type Settings } from './settings.ts'
 import { initialState, type EngineState, type Snapshot } from './state.ts'
@@ -9,6 +10,8 @@ export type RuntimeOptions = {
   baseUrl: string
   /** セーブ可能点に到達するたびに呼ばれる（オートセーブ用） */
   onSaveable?: () => void
+  /** 省略時は何もしない実装。コアが DOM/Web Audio に直接触らないための注ぎ口 */
+  audio?: AudioPort
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -21,6 +24,7 @@ export class Runtime {
   readonly novelId: string
   private readonly baseUrl: string
   private readonly onSaveable?: () => void
+  protected readonly audio: AudioPort
 
   private state: EngineState
   private listeners = new Set<() => void>()
@@ -42,6 +46,7 @@ export class Runtime {
     this.novelId = opts.novelId
     this.baseUrl = opts.baseUrl
     this.onSaveable = opts.onSaveable
+    this.audio = opts.audio ?? nullAudio
     this.state = initialState(opts.script.scenes[0]?.id ?? '')
     this.sceneEntry = structuredClone(this.state.snapshot)
   }
@@ -71,6 +76,17 @@ export class Runtime {
 
   setSettings(s: Settings): void {
     this.settings = s
+    this.audio.setVolumes(s.volume)
+  }
+
+  /** タイトル画面のボタンハンドラから同期的に呼ぶこと */
+  unlockAudio(): void {
+    this.audio.unlock()
+    this.audio.setVolumes(this.settings.volume)
+  }
+
+  resumeAudio(): void {
+    this.audio.resumeIfSuspended()
   }
 
   getSettings(): Settings {
@@ -165,8 +181,26 @@ export class Runtime {
         await this.perform(FLASHBACK_FADE_MS)
         break
 
-      default:
-        // 残りの演出命令は Task 12 以降で足す
+      case 'bgm':
+        // 同名の再指定では鳴らし直さない。曲頭に戻すとシーンをまたぐ持ち越しと噛み合わない
+        if (this.state.snapshot.bgm !== step.name) {
+          this.state.snapshot.bgm = step.name
+          this.emit()
+          if (!this.replaying) this.audio.syncBgm(step.name, 0)
+        }
+        break
+
+      case 'bgmStop':
+        if (this.state.snapshot.bgm !== null) {
+          this.state.snapshot.bgm = null
+          this.emit()
+          if (!this.replaying) this.audio.syncBgm(null, step.fade)
+        }
+        break
+
+      case 'se':
+        // SE は状態ではなく発火。snapshot に入らず、リプレイ中は鳴らさない
+        if (!this.replaying) this.audio.playSe(step.name)
         break
     }
   }
