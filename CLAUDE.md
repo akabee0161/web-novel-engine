@@ -1,4 +1,6 @@
-# web-novel-engine
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ブラウザで動くサウンドノベル / ビジュアルノベルエンジン。台本（`.wn`）をビルド時に JSON へ
 コンパイルし、React 非依存のコアが実行する。作品は `novels/<作品ID>/` に1つずつ置く。
@@ -33,6 +35,9 @@
 
 ## コマンド
 
+**Node 22 以上。** `vite.config.ts` / `vitest.config.ts` が `import.meta.dirname` を使う。
+`package.json` に `engines` フィールドが無いため、古い Node でも `npm install` は通ってしまう。
+
 ```bash
 NOVEL=kieta-ippen npm run dev     # 開発サーバ（NOVEL は必須）
 NOVEL=kieta-ippen npm run build   # dist/kieta-ippen/ に出力
@@ -44,6 +49,10 @@ npm run lint
 npm run typecheck
 npm run gen:assets  # 1作目のダミー素材を再生成する
 ```
+
+**拡張子で走らせる側が決まる。** `tests/**/*.test.ts` は Vitest、`tests/e2e/**/*.spec.ts` は
+Playwright。`tests/e2e/` に `.test.ts` を置くと **Vitest も拾ってしまい**、
+ブラウザ無しで実行されて必ず落ちる。
 
 **コードを変えたら `npm run typecheck && npm run lint && npm test` を通してから報告する。**
 DOM に関わる変更（UI・演出・ページ分割）は `npm run test:e2e` も走らせる。
@@ -75,18 +84,13 @@ DOM に関わる変更（UI・演出・ページ分割）は `npm run test:e2e` 
 - エラーメッセージ・コメント・ドキュメントは日本語
 - 実装は `docs/implementation-plan.md` の Task 単位。1タスク1コミット
 
-## 構成
+## 境界
 
-```
-src/engine/
-├── index.ts     ← 作品が触ってよい唯一の入口。boot() だけ
-├── core/        ← React 非依存の素の TypeScript
-└── ui/          ← React。core を useSyncExternalStore で購読して描くだけ
-tools/wn-compile/  ← 台本コンパイラ（Vite プラグイン）。依存の向きは tools → engine
-tests/{compile,core}/  ← Vitest
-tests/e2e/             ← Playwright。DOM でしか確認できないもの
-novels/<作品ID>/       ← 作品。増やすコストはディレクトリ1つ
-```
+ESLint の `no-restricted-imports` が機械的に守っている。次の import は全て禁止。
 
-境界は ESLint の `no-restricted-imports` が守っている。エンジン → `novels/`、
-作品 → `@engine` 以外の `src/engine/**`、`core/` → `ui/`、エンジン → `tools/` は全て禁止。
+| 禁止 | 理由 |
+|---|---|
+| エンジン → `novels/` | エンジンが特定作品に依存しない |
+| 作品 → `@engine` 以外の `src/engine/**` | 公開面を1つに保つ |
+| `core/` → `ui/`、`core/` → `react` | コアを React 非依存に保つ |
+| エンジン → `tools/` | 型の依存を tools → engine の一方向に保つ |
