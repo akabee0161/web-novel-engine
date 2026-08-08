@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
+import { resolveAssetsDir } from './tools/wn-compile/config.ts'
 import { wnCompile } from './tools/wn-compile/index.ts'
 
 export default defineConfig(() => {
@@ -11,9 +12,12 @@ export default defineConfig(() => {
     )
   }
   const root = resolve(import.meta.dirname, 'novels', novel)
+  // 素材の置き場所は作品ごとに差し替えられる。既定は <作品ディレクトリ>/public
+  const assetsDir = resolveAssetsDir(root)
   return {
     root,
     base: './',
+    publicDir: assetsDir,
     build: {
       outDir: resolve(import.meta.dirname, 'dist', novel),
       emptyOutDir: true,
@@ -21,6 +25,6 @@ export default defineConfig(() => {
     resolve: {
       alias: { '@engine': resolve(import.meta.dirname, 'src/engine/index.ts') },
     },
-    plugins: [react(), wnCompile({ root })],
+    plugins: [react(), wnCompile({ assetsDir })],
   }
 })

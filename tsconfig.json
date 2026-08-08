@@ -16,5 +16,8 @@
     "types": ["vite/client", "node"],
     "paths": { "@engine": ["./src/engine/index.ts"] }
   },
-  "include": ["src", "tools", "novels", "tests", "vite.config.ts", "vitest.config.ts"]
+  "include": [
+    "src", "tools", "novels", "tests",
+    "vite.config.ts", "vitest.config.ts", "playwright.config.ts"
+  ]
 }

@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { join } from 'node:path'
 import type { Plugin } from 'vite'
 import type { CompiledScript, Scene, Step } from '../../src/engine/core/script.ts'
 import { scanAssets } from './assets.ts'
@@ -60,12 +59,13 @@ export function compile(source: string, file: string, publicDir: string): Compil
   return { title: raw.title, protagonist: raw.protagonist, scenes, assets }
 }
 
-export function wnCompile(opts: { root: string }): Plugin {
+/** `assetsDir` は `resolveAssetsDir()`（config.ts）が決めた絶対パス */
+export function wnCompile(opts: { assetsDir: string }): Plugin {
   return {
     name: 'wn-compile',
     transform(code, id) {
       if (!id.endsWith('.wn')) return
-      const script = compile(code, id, join(opts.root, 'public'))
+      const script = compile(code, id, opts.assetsDir)
       return { code: `export default ${JSON.stringify(script)}`, map: null }
     },
   }
