@@ -23,7 +23,7 @@
 [完了] フェーズ1  土台と最小パーサ          Task 1-4
 [完了] フェーズ2  コアの骨格                Task 5-6
 [完了] フェーズ3  最小UI（ここで動く）      Task 7-8
-[途中] フェーズ4  命令を1つずつ           Task 9-10 完了 / 11-12
+[途中] フェーズ4  命令を1つずつ           Task 9-11 完了 / 12
 [  ] フェーズ5  既読・バックログ・セーブ  Task 13-16
 [  ] フェーズ6  ページ送りと仕上げ        Task 17-18
 ```
@@ -64,9 +64,14 @@
 | 10 | Task 9 Step 8「実機で確認する」が手動前提 | Playwright に2件足した（背景の切替順・フェード中のクリック） | 逸脱7 と同じ。あわせて背景レイヤに `data-bg` を出した（E2E から背景名を取るため。逸脱9 の `data-phase` と同じ扱い） |
 | 11 | Task 10 Step 7「実機で確認する」が手動前提 | Playwright に1件足した（立ち絵の出入りと位置）。立ち絵に `data-sprite` / `data-expr` を出した | 逸脱10 と同じ |
 | 12 | — | 既存 E2E「文字送りは1文字ずつ進み…」の計測を 5回×90ms → 3回×60ms に縮め、tap 直前に `phase === 'typing'` を明示した | E2E が8本になって並列負荷が上がり、計測ループが文字送りの予算（21文字×40ms=840ms）を超えて 3回中2回落ちた。掴む本文がずれるだけで実装の不具合ではない |
+| 13 | Task 11 Step 1 のテストに申し送りの分がない | 「演出中のクリック」3件を足した（打ち切り・本文を飛ばさない・連打で1つずつ）。Step 3 にない `performCancel` と `advance()` の `performing` 分岐も実装した | Step 1/3 のコードだけでは申し送り（`perform()` を中断可能にする）が実装されないため |
+| 14 | Task 11 Step 1 の2件が空振りで通る | 待ち合わせを `phase === 'performing'` から `view.fadeMs` に変えた | `initialState` の `phase` が `performing` なので、待ちに入る前でも条件が成立してしまう |
+| 15 | Task 9 で足した E2E「フェード中はクリックしても進まない」 | 「演出中のクリックは待ちを打ち切るだけで、本文は飛ばさない」に書き換えた | Task 11 で仕様が変わった。打ち切りの時間的な検証は core のテストが持つ |
+| 16 | Task 11 Step 7「実機で確認する」が手動前提 | Playwright に1件足した（`@flashback` の区間） | 逸脱10 と同じ。`@speed` / `@wait` は時間の検証なので core 側に置いた |
 
 **フェーズ3 完了後に確定した仕様**（Task 10 / 11 / 14 に申し送り済み）:
-演出中のクリックは現在の待ちだけ打ち切る／`view` と `snapshot` の配列は置き換える。
+演出中のクリックは現在の待ちだけ打ち切る（**Task 11 で実装済み**）／
+`view` と `snapshot` の配列は置き換える（`sprites` は **Task 10 で実装済み**、`backlog` は Task 14）。
 
 **採用したツールのバージョン**（計画が書かれた時点より新しい）:
 Vite 8 / TypeScript 6 / ESLint 10 / Vitest 4 / React 19。
@@ -2677,7 +2682,7 @@ git commit -m "feat: @show / @hide の立ち絵表示を実装する"
 > `performing` の分岐を足す。次の本文ブロックには進めないこと。
 > テストは「`@wait 5000` の最中に `advance()` すると即座に次へ進む」で固定する。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 describe('@wait / @speed / @flashback', () => {
@@ -2726,12 +2731,12 @@ describe('@wait / @speed / @flashback', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/core/steps.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: `runtime.exec` に3命令を足す**
+- [x] **Step 3: `runtime.exec` に3命令を足す**
 
 ファイル冒頭に定数を置く。
 
@@ -2762,12 +2767,12 @@ const FLASHBACK_FADE_MS = 600
 `@speed` は瞬時に効くので `perform()` を呼ばない。
 `@flashback` は画面効果の切替なので、その分だけ止める。
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/steps.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: `Stage.tsx` に回想の画面効果を足す**
+- [x] **Step 5: `Stage.tsx` に回想の画面効果を足す**
 
 `.wn-scene` の className を状態で切り替える。
 
@@ -2781,7 +2786,7 @@ Expected: PASS
       <div className="wn-flashback-veil" />
 ```
 
-- [ ] **Step 6: `style.css` に回想のスタイルを足す**
+- [x] **Step 6: `style.css` に回想のスタイルを足す**
 
 ```css
 .wn-scene { transition: filter 600ms linear; }
@@ -2801,7 +2806,7 @@ Expected: PASS
 CSS 側の 600ms は `FLASHBACK_FADE_MS` と同じ値。
 **片方だけ変えると演出とコアの待ち時間がずれる**ので、変えるときは両方直す。
 
-- [ ] **Step 7: 実機で確認する**
+- [x] **Step 7: 実機で確認する**
 
 ```bash
 NOVEL=kieta-ippen npm run dev
@@ -2812,7 +2817,7 @@ NOVEL=kieta-ippen npm run dev
 3. トオル登場前の `@wait 300` で一拍空く
 4. 「回想・昨日の部室」で画面がセピアになり、`@flashback off` で戻る
 
-- [ ] **Step 8: コミット**
+- [x] **Step 8: コミット**
 
 ```bash
 git add -A

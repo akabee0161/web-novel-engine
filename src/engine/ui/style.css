@@ -26,7 +26,21 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
   cursor: pointer;
 }
 
-.wn-scene { position: absolute; inset: 0; }
+.wn-scene { position: absolute; inset: 0; transition: filter 600ms linear; }
+
+/* 600ms は runtime.ts の FLASHBACK_FADE_MS と同じ値。
+   片方だけ変えると演出とコアの待ち時間がずれるので、変えるときは両方直す */
+.wn-flashback { filter: sepia(0.55) contrast(0.92) brightness(0.92); }
+
+.wn-flashback-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(255, 236, 190, 0) 45%, rgba(120, 90, 40, 0.45) 100%);
+  opacity: 0;
+  transition: opacity 600ms linear;
+}
+.wn-flashback .wn-flashback-veil { opacity: 1; }
 
 .wn-bg-layer {
   position: absolute;

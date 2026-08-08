@@ -13,6 +13,9 @@ export type RuntimeOptions = {
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
+/** @flashback の切替にかける時間。台本に引数がないのでエンジン側の定数。style.css と揃える */
+const FLASHBACK_FADE_MS = 600
+
 export class Runtime {
   readonly script: CompiledScript
   readonly novelId: string
@@ -25,6 +28,8 @@ export class Runtime {
   private settings: Settings = DEFAULT_SETTINGS
   /** 文字送りを打ち切って全文表示するためのフラグ */
   private skipTyping = false
+  /** 進行中の perform() の待ちを打ち切る。待っていないときは null */
+  private performCancel: (() => void) | null = null
 
   /** リプレイ中は待ち時間を一切消費しない */
   protected replaying = false
@@ -144,8 +149,24 @@ export class Runtime {
         this.emit()
         break
 
+      case 'wait':
+        await this.perform(step.ms)
+        break
+
+      case 'speed':
+        // 瞬時に効くので待たない
+        this.state.snapshot.speed = step.value
+        this.emit()
+        break
+
+      case 'flashback':
+        this.state.snapshot.flashback = step.on
+        this.emit()
+        await this.perform(FLASHBACK_FADE_MS)
+        break
+
       default:
-        // 残りの演出命令は Task 11 以降で足す
+        // 残りの演出命令は Task 12 以降で足す
         break
     }
   }
@@ -207,12 +228,23 @@ export class Runtime {
    *
    * transitionend は使わない。発火が保証されず、描画を伴わないリプレイでも検知できないため。
    */
-  protected async perform(ms: number): Promise<void> {
-    if (this.replaying || ms <= 0) return
+  protected perform(ms: number): Promise<void> {
+    if (this.replaying || ms <= 0) return Promise.resolve()
     this.state.view.phase = 'performing'
     this.state.view.fadeMs = ms
     this.emit()
-    await sleep(ms)
+    return new Promise<void>((resolve) => {
+      const done = () => {
+        this.performCancel = null
+        resolve()
+      }
+      const timer = setTimeout(done, ms)
+      // 読者のクリックで、この待ちだけを打ち切れるようにする
+      this.performCancel = () => {
+        clearTimeout(timer)
+        done()
+      }
+    })
   }
 
   /** 読者のクリック */
@@ -220,6 +252,14 @@ export class Runtime {
     // 文字送り中のクリックは、全文を表示して止める（次には進まない）
     if (this.state.view.phase === 'typing') {
       this.skipTyping = true
+      return
+    }
+    // 演出中のクリックは、進行中の待ちだけを打ち切る。
+    // 次の本文ブロックには進めないので、連打すると待ちを1つずつ飛ばすことになる
+    if (this.state.view.phase === 'performing') {
+      const cancel = this.performCancel
+      this.performCancel = null
+      cancel?.()
       return
     }
     if (this.state.view.phase !== 'waiting') return

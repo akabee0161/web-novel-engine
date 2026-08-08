@@ -24,7 +24,7 @@ export function Stage({ runtime, state }: Props) {
   }
 
   return (
-    <div className="wn-scene">
+    <div className={`wn-scene${state.snapshot.flashback ? ' wn-flashback' : ''}`}>
       {under.current && (
         <div className="wn-bg-layer" style={{ backgroundImage: url(under.current) }} />
       )}
@@ -57,6 +57,8 @@ export function Stage({ runtime, state }: Props) {
           />
         )
       })}
+
+      <div className="wn-flashback-veil" />
     </div>
   )
 }

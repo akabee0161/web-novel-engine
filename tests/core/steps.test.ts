@@ -133,3 +133,90 @@ describe('@show / @hide', () => {
     expect(r.getState().snapshot.sprites).toEqual([{ id: 'mika', expr: 'smile', pos: 'left' }])
   })
 })
+
+describe('@wait / @speed / @flashback', () => {
+  it('@wait は performing で指定時間だけ止まる', async () => {
+    const r = runtimeOf([{ t: 'wait', ms: 200 }])
+    const started = Date.now()
+    void r.start()
+    await vi.waitFor(() => expect(r.getState().view.phase).toBe('performing'))
+    await vi.waitFor(() => expect(r.getState().view.phase).toBe('waiting'), { timeout: 2000 })
+    expect(Date.now() - started).toBeGreaterThanOrEqual(180)
+  })
+
+  it('@speed は snapshot に入り、シーンをまたいで持続する', async () => {
+    const r = runtimeOf([{ t: 'speed', value: 'slow' }])
+    await runToWait(r)
+    expect(r.getState().snapshot.speed).toBe('slow')
+  })
+
+  it('@flashback on / off が snapshot に入る', async () => {
+    const on = runtimeOf([{ t: 'flashback', on: true }])
+    await runToWait(on)
+    expect(on.getState().snapshot.flashback).toBe(true)
+
+    const off = runtimeOf([{ t: 'flashback', on: true }, { t: 'flashback', on: false }])
+    await runToWait(off)
+    expect(off.getState().snapshot.flashback).toBe(false)
+  })
+
+  it('@speed slow の区間は文字送りが遅くなる', async () => {
+    const r = new Runtime({
+      novelId: 't', baseUrl: 'https://x.test/',
+      script: {
+        title: 't', protagonist: null, assets: {},
+        scenes: [{ id: 'A', steps: [
+          { t: 'speed', value: 'slow' },
+          { t: 'text', i: 0, h: 'h', speaker: null, body: 'あいう' },
+        ] }],
+      },
+    })
+    r.setSettings({ textMode: 'sequential', textSpeed: 'fast', volume: { master: 1, bgm: 1, se: 1 } })
+    const started = Date.now()
+    await runToWait(r)
+    // fast(0.5) × slow(2.0) × 40ms = 40ms/文字 × 3文字
+    expect(Date.now() - started).toBeGreaterThanOrEqual(100)
+  })
+})
+
+describe('演出中のクリック', () => {
+  it('@wait 5000 の最中に advance() すると即座に次へ進む', async () => {
+    const r = runtimeOf([{ t: 'wait', ms: 5000 }])
+    void r.start()
+    // 初期状態の phase も performing なので、待ちに入ったことは fadeMs で見る
+    await vi.waitFor(() => expect(r.getState().view.fadeMs).toBe(5000))
+    expect(r.getState().view.phase).toBe('performing')
+
+    const started = Date.now()
+    r.advance()
+    await vi.waitFor(() => expect(r.getState().view.phase).toBe('waiting'), { timeout: 1000 })
+    expect(Date.now() - started).toBeLessThan(1000)
+  })
+
+  it('打ち切るのは現在の待ちだけで、次の本文ブロックには進まない', async () => {
+    const r = runtimeOf([{ t: 'wait', ms: 5000 }])
+    void r.start()
+    await vi.waitFor(() => expect(r.getState().view.fadeMs).toBe(5000))
+
+    r.advance()
+    await vi.waitFor(() => expect(r.getState().view.phase).toBe('waiting'), { timeout: 1000 })
+    // 待ちの次にある本文が表示されており、飛ばされていない
+    expect(r.getState().view.currentText?.body).toBe('.')
+  })
+
+  it('連続した待ちは、クリックのたびに1つずつ打ち切られる', async () => {
+    // 尺を変えておくと、2つ目の待ちに入ったことを fadeMs で見分けられる
+    const r = runtimeOf([{ t: 'wait', ms: 5000 }, { t: 'wait', ms: 4000 }])
+    void r.start()
+    await vi.waitFor(() => expect(r.getState().view.fadeMs).toBe(5000))
+
+    // 1回目のクリックでは1つ目の待ちが終わるだけで、2つ目の待ちに入る
+    r.advance()
+    await vi.waitFor(() => expect(r.getState().view.fadeMs).toBe(4000))
+    expect(r.getState().view.phase).toBe('performing')
+    expect(r.getState().view.currentText).toBeNull()
+
+    r.advance()
+    await vi.waitFor(() => expect(r.getState().view.phase).toBe('waiting'), { timeout: 1000 })
+  })
+})

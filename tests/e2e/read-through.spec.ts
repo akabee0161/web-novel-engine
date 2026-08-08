@@ -37,7 +37,17 @@ async function settle(page: Page) {
   await expect(stage(page)).toHaveAttribute('data-phase', /waiting|ended/)
 }
 
-type Block = { body: string; speaker: string | null; bg: string | null; sprites: string[] }
+/** 回想の画面効果がかかっているか */
+const flashbackOn = (page: Page) =>
+  page.locator('.wn-scene').evaluate((el) => el.classList.contains('wn-flashback'))
+
+type Block = {
+  body: string
+  speaker: string | null
+  bg: string | null
+  sprites: string[]
+  flashback: boolean
+}
 
 /** 台本を終端まで読み進め、通過した本文ブロックを記録する */
 async function readAll(page: Page): Promise<Block[]> {
@@ -50,6 +60,7 @@ async function readAll(page: Page): Promise<Block[]> {
       speaker: (await speaker(page).count()) ? await speaker(page).textContent() : null,
       bg: (await bgLayer(page).count()) ? await bgLayer(page).getAttribute('data-bg') : null,
       sprites: await readSprites(page),
+      flashback: await flashbackOn(page),
     })
     await tap(page)
     // クリックが効いて次に移ったことを確かめてから、次の周回に入る
@@ -157,7 +168,22 @@ test('立ち絵は @show / @hide どおりに出入りする', async ({ page }) 
   expect(warnings).toEqual([])
 })
 
-test('フェード中はクリックしても進まない', async ({ page }) => {
+test('@flashback on / off の区間だけ回想の画面効果がかかる', async ({ page }) => {
+  await startReading(page)
+  const blocks = await readAll(page)
+
+  const on = blocks.flatMap((b, i) => (b.flashback ? [i] : []))
+  expect(on.length).toBeGreaterThan(0)
+  // 効果がかかる区間は1つながり（@flashback on … off が1組だけ）
+  expect(on.at(-1)! - on[0]).toBe(on.length - 1)
+  // 台本の「回想・昨日の部室」だけが対象。前後のブロックは素のまま
+  expect(blocks[on[0] - 1].flashback).toBe(false)
+  expect(blocks[on.at(-1)! + 1].flashback).toBe(false)
+  // 回想は背景を持ち越した clubroom_day で起きる
+  expect(blocks[on[0]].bg).toBe('clubroom_day')
+})
+
+test('演出中のクリックは待ちを打ち切るだけで、本文は飛ばさない', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'はじめから' }).click()
 
@@ -167,12 +193,12 @@ test('フェード中はクリックしても進まない', async ({ page }) => 
   await expect(bgLayer(page)).toHaveCSS('animation-duration', '0.6s')
   await expect(page.locator('.wn-messagebox')).toHaveCount(0)
 
+  // 打ち切られても飛ばされないので、出てくるのは1つ目の本文。
+  // 「打ち切る」こと自体の時間的な検証は core のテストが持っている
+  // （tests/core/steps.test.ts の「演出中のクリック」）
   await tap(page)
-  await expect(stage(page)).toHaveAttribute('data-phase', 'performing')
-  await expect(page.locator('.wn-messagebox')).toHaveCount(0)
-
-  // フェードが終われば本文に進む
-  await expect(body(page)).toContainText('放課後', { timeout: 3000 })
+  await settle(page)
+  await expect(body(page)).toHaveText(FIRST_BODY)
 })
 
 test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) => {
