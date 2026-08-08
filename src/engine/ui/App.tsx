@@ -3,11 +3,12 @@ import type { Runtime } from '../core/runtime.ts'
 import { Backlog } from './Backlog.tsx'
 import { MessageBox } from './MessageBox.tsx'
 import { SaveMenu } from './SaveMenu.tsx'
+import { Settings } from './Settings.tsx'
 import { Stage } from './Stage.tsx'
 import { Title } from './Title.tsx'
 import { useEngine } from './useEngine.ts'
 
-type Ui = 'none' | 'backlog' | 'save' | 'load'
+type Ui = 'none' | 'backlog' | 'save' | 'load' | 'settings'
 
 export function App({ runtime }: { runtime: Runtime }) {
   // 「タイトル画面か本編か」はエンジンの状態ではなく画面の状態なので useState でよい
@@ -75,6 +76,7 @@ export function App({ runtime }: { runtime: Runtime }) {
                 <button className="wn-button" onClick={() => setUi('backlog')}>履歴</button>
                 <button className="wn-button" onClick={() => setUi('save')}>セーブ</button>
                 <button className="wn-button" onClick={() => setUi('load')}>ロード</button>
+                <button className="wn-button" onClick={() => setUi('settings')}>設定</button>
               </div>
             )}
           </>
@@ -84,8 +86,10 @@ export function App({ runtime }: { runtime: Runtime }) {
             hasSave={runtime.listSaves().length > 0}
             onStart={start}
             onContinue={continueGame}
+            onSettings={() => setUi('settings')}
           />
         )}
+        {ui === 'settings' && <Settings runtime={runtime} onClose={() => setUi('none')} />}
         {ui === 'backlog' && (
           <Backlog
             entries={state.view.backlog}

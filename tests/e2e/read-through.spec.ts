@@ -6,6 +6,8 @@ declare global {
     __audioContexts?: number
     /** 実際にデコードした音声素材の数。0 なら検証が空振りしている */
     __decodedAudio?: number
+    /** data-phase の変化を記録したもの。addInitScript が仕込む */
+    __phases?: string[]
   }
 }
 
@@ -401,6 +403,55 @@ test('台本に存在しないシーンのセーブは、黙って飛ばずに�
   expect(dialogs[0]).toContain('消えたシーン')
   // タイトル画面に戻る。別の位置から始まったりしない
   await expect(page.locator('.wn-title')).toBeVisible()
+})
+
+/** 台本の最初の `@speed slow` が効く本文までのブロック数（シーン2の3つ目） */
+const BLOCKS_TO_SPEED_SLOW = SCENE1_BLOCKS + 3
+
+test('一括表示にすると @speed の区間でも文字が流れず、設定はリロードをまたぐ', async ({ page }) => {
+  // data-phase の変化を残す。typing が1度も出ないことで「流れていない」を示す
+  await page.addInitScript(() => {
+    window.__phases = []
+    const attach = () => {
+      const el = document.querySelector('.wn-stage')
+      if (!el) { requestAnimationFrame(attach); return }
+      const record = () => {
+        const p = el.getAttribute('data-phase')
+        if (p) window.__phases!.push(p)
+      }
+      record()
+      new MutationObserver(record).observe(el, { attributes: true, attributeFilter: ['data-phase'] })
+    }
+    requestAnimationFrame(attach)
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: '設定' }).click()
+  await page.getByRole('button', { name: '一括表示' }).click()
+
+  // 一括表示のあいだは @speed ごと無視されるので、速さの選択肢を出す意味がない
+  await expect(page.getByRole('button', { name: '普通', exact: true })).toBeDisabled()
+
+  await page.getByRole('button', { name: '閉じる' }).click()
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+
+  // 一括表示では data-phase が waiting のまま変わらない（文字送りの区間が無い）ので、
+  // 進んだことは本文の変化で待ち合わせる
+  for (let i = 0; i < BLOCKS_TO_SPEED_SLOW; i++) {
+    const before = (await body(page).textContent()) ?? ''
+    await tap(page)
+    await expect(body(page)).not.toHaveText(before)
+  }
+
+  const phases = await page.evaluate(() => window.__phases ?? [])
+  expect(phases).toContain('waiting')
+  expect(phases).not.toContain('typing')
+
+  // リロードしても残る（設定は変更のたびに書き出される）
+  await page.reload()
+  await page.getByRole('button', { name: '設定' }).click()
+  await expect(page.getByRole('button', { name: '一括表示' })).toHaveClass(/is-on/)
 })
 
 test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) => {

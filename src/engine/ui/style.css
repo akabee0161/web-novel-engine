@@ -158,3 +158,23 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
 .wn-slot:disabled { opacity: 0.35; cursor: default; }
 .wn-slot-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85; }
 .wn-slot-time, .wn-slot-empty { opacity: 0.55; font-size: 1.6cqw; }
+
+.wn-setting-row {
+  display: grid;
+  grid-template-columns: 18cqw 1fr;
+  gap: 2cqw;
+  align-items: center;
+}
+.wn-choices { display: flex; gap: 1cqw; }
+.wn-choice {
+  padding: 0.8cqw 2cqw;
+  font: inherit;
+  font-size: 1.9cqw;
+  color: #f2f2f2;
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.12cqw solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.6cqw;
+  cursor: pointer;
+}
+.wn-choice.is-on { background: rgba(255, 255, 255, 0.28); }
+.wn-choice:disabled { opacity: 0.35; cursor: default; }
