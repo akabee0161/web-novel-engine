@@ -247,6 +247,43 @@ test('演出中のクリックは待ちを打ち切るだけで、本文は飛�
   await expect(body(page)).toHaveText(FIRST_BODY)
 })
 
+/** localStorage のシステムデータ。まだ書き出されていなければ null */
+const systemData = (page: Page) =>
+  page.evaluate(() => {
+    const raw = localStorage.getItem('wn:kieta-ippen:system')
+    return raw ? (JSON.parse(raw) as { read: string[] }) : null
+  })
+
+/** 本文を n ブロック表示する。最後のブロックはクリックせずクリック待ちのまま残す */
+async function readBlocks(page: Page, n: number) {
+  for (let i = 0; i < n; i++) {
+    await settle(page)
+    if (i === n - 1) break
+    await tap(page)
+    await expect(async () => expect(await phase(page)).not.toBe('waiting')).toPass({ timeout: 5000 })
+  }
+}
+
+test('既読はセーブ操作なしに記録され、リロードしても残る', async ({ page }) => {
+  await startReading(page)
+  await readBlocks(page, 3)
+
+  // セーブ操作は一度もしていない。それでも離脱時に書き出される
+  await page.reload()
+  const first = await systemData(page)
+  expect(first?.read).toHaveLength(3)
+
+  // 続きを読むと、前回の分を保ったまま伸びる
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+  await readBlocks(page, 5)
+  await page.reload()
+
+  const second = await systemData(page)
+  expect(second?.read).toHaveLength(5)
+  expect(second!.read.slice(0, 3)).toEqual(first!.read)
+})
+
 test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) => {
   await page.goto('/')
   for (const size of [{ width: 900, height: 1400 }, { width: 1600, height: 500 }]) {

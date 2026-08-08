@@ -1,7 +1,9 @@
 import { nullAudio, type AudioPort } from './audio.ts'
+import { ReadSet } from './read.ts'
 import type { CompiledScript, Step } from './script.ts'
-import { DEFAULT_SETTINGS, charDelayMs, type Settings } from './settings.ts'
+import { charDelayMs, type Settings } from './settings.ts'
 import { initialState, type EngineState, type Snapshot } from './state.ts'
+import { SystemStore, memoryStorage, type Storage } from './storage.ts'
 
 export type RuntimeOptions = {
   script: CompiledScript
@@ -12,6 +14,8 @@ export type RuntimeOptions = {
   onSaveable?: () => void
   /** 省略時は何もしない実装。コアが DOM/Web Audio に直接触らないための注ぎ口 */
   audio?: AudioPort
+  /** 省略時はインメモリ。UI 層が localStorage 実装を渡す */
+  storage?: Storage
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -25,11 +29,14 @@ export class Runtime {
   private readonly baseUrl: string
   private readonly onSaveable?: () => void
   protected readonly audio: AudioPort
+  protected readonly storage: Storage
+  protected readonly system: SystemStore
+  protected readonly read: ReadSet
 
   private state: EngineState
   private listeners = new Set<() => void>()
   private clickResolve: (() => void) | null = null
-  private settings: Settings = DEFAULT_SETTINGS
+  private settings: Settings
   /** 文字送りを打ち切って全文表示するためのフラグ */
   private skipTyping = false
   /** 進行中の perform() の待ちを打ち切る。待っていないときは null */
@@ -47,6 +54,13 @@ export class Runtime {
     this.baseUrl = opts.baseUrl
     this.onSaveable = opts.onSaveable
     this.audio = opts.audio ?? nullAudio
+    // storage は1つだけ作ってフィールドに持つ。使う場所ごとに memoryStorage() を呼ぶと
+    // 別インスタンスになり、セーブとシステムデータが別の入れ物に入る
+    this.storage = opts.storage ?? memoryStorage()
+    this.system = new SystemStore(this.storage, opts.novelId)
+    const data = this.system.load()
+    this.read = new ReadSet(data.read)
+    this.settings = data.settings
     this.state = initialState(opts.script.scenes[0]?.id ?? '')
     this.sceneEntry = structuredClone(this.state.snapshot)
   }
@@ -77,6 +91,20 @@ export class Runtime {
   setSettings(s: Settings): void {
     this.settings = s
     this.audio.setVolumes(s.volume)
+    // 設定変更は数が少なく、次の起動に残らないと読者が困る。ここだけは即座に書き出す
+    this.system.save({ read: this.read.toArray(), settings: s })
+    this.emit()
+  }
+
+  isRead(hash: string): boolean {
+    return this.read.has(hash)
+  }
+
+  /** 既読をストレージへ書き出す。前回の書き出し以降に追加が無ければ何もしない */
+  flushSystem(): void {
+    const read = this.read.takeDirty()
+    if (!read) return
+    this.system.save({ read, settings: this.settings })
   }
 
   /** タイトル画面のボタンハンドラから同期的に呼ぶこと */
@@ -206,6 +234,8 @@ export class Runtime {
   }
 
   private async execText(step: Extract<Step, { t: 'text' }>): Promise<void> {
+    // セーブ操作とは無関係に、本文を表示した瞬間に記録する
+    this.read.add(step.h)
     this.state.progress.index = step.i
     this.state.view.currentText = { speaker: step.speaker, body: step.body }
     this.state.view.visibleChars = 0

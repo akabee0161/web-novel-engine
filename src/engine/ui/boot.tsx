@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import { WebAudio } from '../core/audio.ts'
 import type { CompiledScript } from '../core/script.ts'
 import { Runtime } from '../core/runtime.ts'
+import { browserStorage } from '../core/storage.ts'
 import { App } from './App.tsx'
 import './style.css'
 
@@ -26,6 +27,16 @@ export function boot(opts: BootOptions): void {
     novelId: opts.novelId,
     baseUrl,
     audio: new WebAudio(resolve),
+    storage: browserStorage(),
   })
+
+  // 既読は本文1ブロックごとに増える。1ブロックごとに localStorage を触ると
+  // 文字送りと同じ頻度で同期 I/O が走るため、まとめて書き出す
+  const timer = setInterval(() => runtime.flushSystem(), 5000)
+  addEventListener('pagehide', () => {
+    clearInterval(timer)
+    runtime.flushSystem()
+  })
+
   createRoot(opts.mount).render(<App runtime={runtime} />)
 }

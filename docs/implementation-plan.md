@@ -70,6 +70,8 @@
 | 16 | Task 11 Step 7「実機で確認する」が手動前提 | Playwright に1件足した（`@flashback` の区間） | 逸脱10 と同じ。`@speed` / `@wait` は時間の検証なので core 側に置いた |
 | 17 | Task 12 Step 8「実機で確認する」が手動前提 | Playwright に1件足した。`AudioContext` の生成回数と `decodeAudioData` の回数を計測し、通し読みで警告が出ないことを見る | 逸脱10 と同じ。**鳴っているかどうかは検証できない**ので、解禁の起点（タイトル画面のクリック）と素材のデコード成功までを固定した。iOS Safari での実聴は未実施 |
 | 18 | Task 12 Step 3/4 の `exec` に `default` 節あり | `default` を削除した | 10命令すべてが揃い、`switch` が網羅的になったため |
+| 19 | Task 13 Step 8「実機で確認する」が手動前提 | Playwright に1件足した（読み進めた分が `wn:kieta-ippen:system` に入り、リロードしても残る） | 逸脱10 と同じ。書き出しの契機は `pagehide` を使うため、`page.reload()` がそのまま検証になる |
+| 20 | Task 13 Step 1 のテストに設定の永続化がない | 「設定の永続化」2件を足した（`setSettings` が次回起動に残る・設定の書き出しで既読が消えない） | Step 5 の `setSettings` は `read.toArray()` を書いており、ここを `[]` にしても Step 1 のテストは全部通ってしまう |
 
 **フェーズ3 完了後に確定した仕様**（Task 10 / 11 / 14 に申し送り済み）:
 演出中のクリックは現在の待ちだけ打ち切る（**Task 11 で実装済み**）／
@@ -3260,7 +3262,7 @@ git commit -m "feat: Web Audio による @bgm / @se と音声の解禁を実装�
 
 **既読はセーブと完全に独立している。** セーブせずにブラウザを閉じても既読は残る。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 // tests/core/read.test.ts
@@ -3331,12 +3333,12 @@ describe('既読の記録', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/core/read.test.ts`
 Expected: FAIL（モジュールが無い）
 
-- [ ] **Step 3: `src/engine/core/storage.ts` を書く**
+- [x] **Step 3: `src/engine/core/storage.ts` を書く**
 
 ```ts
 import { DEFAULT_SETTINGS, type Settings } from './settings.ts'
@@ -3406,7 +3408,7 @@ export class SystemStore {
 }
 ```
 
-- [ ] **Step 4: `src/engine/core/read.ts` を書く**
+- [x] **Step 4: `src/engine/core/read.ts` を書く**
 
 ```ts
 /**
@@ -3448,7 +3450,7 @@ export class ReadSet {
 }
 ```
 
-- [ ] **Step 5: `Runtime` に既読を組み込む**
+- [x] **Step 5: `Runtime` に既読を組み込む**
 
 `RuntimeOptions` に足す。
 
@@ -3507,12 +3509,12 @@ export class ReadSet {
     this.read.add(step.h)
 ```
 
-- [ ] **Step 6: テストが通ることを確認する**
+- [x] **Step 6: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/`
 Expected: PASS
 
-- [ ] **Step 7: `boot.tsx` で localStorage と定期書き出しを繋ぐ**
+- [x] **Step 7: `boot.tsx` で localStorage と定期書き出しを繋ぐ**
 
 `Runtime` の生成に `storage: browserStorage()` を足し、書き出しの契機を用意する。
 
@@ -3525,7 +3527,7 @@ Expected: PASS
   })
 ```
 
-- [ ] **Step 8: 実機で確認する**
+- [x] **Step 8: 実機で確認する**
 
 ```bash
 NOVEL=kieta-ippen npm run dev
@@ -3537,7 +3539,7 @@ DevTools の Application → Local Storage で `wn:kieta-ippen:system` を見る
 2. リロードしても消えない
 3. タブを閉じる直前の分まで入っている
 
-- [ ] **Step 9: コミット**
+- [x] **Step 9: コミット**
 
 ```bash
 git add -A
