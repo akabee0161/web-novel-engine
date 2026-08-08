@@ -110,8 +110,15 @@ export class Runtime {
       case 'text':
         await this.execText(step)
         break
+      case 'bg':
+        // 状態を先に更新してから待つ。UI は新しい背景を fadeMs 付きで描き始め、
+        // コアはその時間だけ止まる。transitionend は見ない
+        this.state.snapshot.bg = step.name
+        this.emit()
+        await this.perform(step.fade)
+        break
       default:
-        // 演出命令は Task 9 以降で足す
+        // 残りの演出命令は Task 10 以降で足す
         break
     }
   }

@@ -8,6 +8,8 @@ const TOTAL_BLOCKS = 63
 const stage = (page: Page) => page.locator('.wn-stage')
 const body = (page: Page) => page.locator('.wn-messagebox > div:last-child')
 const speaker = (page: Page) => page.locator('.wn-speaker')
+/** 手前に出ている背景レイヤ。data-bg に @bg の引数が入る */
+const bgLayer = (page: Page) => page.locator('.wn-bg-in')
 
 const phase = (page: Page) => stage(page).getAttribute('data-phase')
 
@@ -26,7 +28,7 @@ async function settle(page: Page) {
   await expect(stage(page)).toHaveAttribute('data-phase', /waiting|ended/)
 }
 
-type Block = { body: string; speaker: string | null }
+type Block = { body: string; speaker: string | null; bg: string | null }
 
 /** 台本を終端まで読み進め、通過した本文ブロックを記録する */
 async function readAll(page: Page): Promise<Block[]> {
@@ -37,6 +39,7 @@ async function readAll(page: Page): Promise<Block[]> {
     blocks.push({
       body: (await body(page).textContent()) ?? '',
       speaker: (await speaker(page).count()) ? await speaker(page).textContent() : null,
+      bg: (await bgLayer(page).count()) ? await bgLayer(page).getAttribute('data-bg') : null,
     })
     await tap(page)
     // クリックが効いて次に移ったことを確かめてから、次の周回に入る
@@ -96,6 +99,39 @@ test('文字送りは1文字ずつ進み、クリックで全文表示になっ�
   // もう一度クリックすると次へ
   await tap(page)
   await expect(body(page)).not.toHaveText(FIRST_BODY)
+})
+
+test('背景は台本の @bg どおりに切り替わる', async ({ page }) => {
+  await startReading(page)
+  const blocks = await readAll(page)
+
+  // 同じ背景が続く区間を畳んで、切り替わった順に並べる
+  const order = blocks.map((b) => b.bg).filter((bg, i, all) => bg !== all[i - 1])
+  expect(order).toEqual([
+    'clubroom_day',      // 部室・放課後（部室・違和感 は @bg を持たないので持ち越し）
+    'corridor_evening',  // 廊下
+    'clubroom_day',      // 回想・昨日の部室
+    'rooftop_door',      // 屋上前
+    'black',             // 引き
+  ])
+})
+
+test('フェード中はクリックしても進まない', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'はじめから' }).click()
+
+  // 冒頭の @bg clubroom_day fade:600 の最中。まだ本文は出ていない
+  await expect(stage(page)).toHaveAttribute('data-phase', 'performing')
+  await expect(bgLayer(page)).toHaveAttribute('data-bg', 'clubroom_day')
+  await expect(bgLayer(page)).toHaveCSS('animation-duration', '0.6s')
+  await expect(page.locator('.wn-messagebox')).toHaveCount(0)
+
+  await tap(page)
+  await expect(stage(page)).toHaveAttribute('data-phase', 'performing')
+  await expect(page.locator('.wn-messagebox')).toHaveCount(0)
+
+  // フェードが終われば本文に進む
+  await expect(body(page)).toContainText('放課後', { timeout: 3000 })
 })
 
 test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) => {

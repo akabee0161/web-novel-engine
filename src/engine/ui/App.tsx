@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Runtime } from '../core/runtime.ts'
 import { MessageBox } from './MessageBox.tsx'
+import { Stage } from './Stage.tsx'
 import { Title } from './Title.tsx'
 import { useEngine } from './useEngine.ts'
 
@@ -22,9 +23,14 @@ export function App({ runtime }: { runtime: Runtime }) {
         data-phase={state.view.phase}
         onClick={() => started && runtime.advance()}
       >
-        {started
-          ? <MessageBox state={state} script={runtime.script} />
-          : <Title title={runtime.script.title} onStart={start} />}
+        {started ? (
+          <>
+            <Stage runtime={runtime} state={state} />
+            <MessageBox state={state} script={runtime.script} />
+          </>
+        ) : (
+          <Title title={runtime.script.title} onStart={start} />
+        )}
       </div>
     </div>
   )

@@ -23,7 +23,7 @@
 [完了] フェーズ1  土台と最小パーサ          Task 1-4
 [完了] フェーズ2  コアの骨格                Task 5-6
 [完了] フェーズ3  最小UI（ここで動く）      Task 7-8
-[  ] フェーズ4  命令を1つずつ             Task 9-12
+[途中] フェーズ4  命令を1つずつ           Task 9 完了 / 10-12
 [  ] フェーズ5  既読・バックログ・セーブ  Task 13-16
 [  ] フェーズ6  ページ送りと仕上げ        Task 17-18
 ```
@@ -61,6 +61,7 @@
 | 7 | Task 7 / 8 の「実機で確認する」が手動前提 | Playwright で自動化し、`tests/e2e/` に残した | 確認項目がすべて DOM から取れる。フェーズ4 の主題（背景・立ち絵・音声）は DOM でしか検証できない |
 | 8 | 素材ディレクトリは `<作品ディレクトリ>/public` に固定 | `novel.config.json` で差し替え可能にした（既定は同じ） | 実素材をリポジトリの外に置けるようにするため。[2026-08-08 の決定](decisions/2026-08-08-asset-location-and-verification.md) |
 | 9 | `.wn-stage` に属性なし | `data-phase` を出すようにした | E2E が文字送りの途中を掴んで不安定になる。CSS の演出フックとしても要る |
+| 10 | Task 9 Step 8「実機で確認する」が手動前提 | Playwright に2件足した（背景の切替順・フェード中のクリック） | 逸脱7 と同じ。あわせて背景レイヤに `data-bg` を出した（E2E から背景名を取るため。逸脱9 の `data-phase` と同じ扱い） |
 
 **フェーズ3 完了後に確定した仕様**（Task 10 / 11 / 14 に申し送り済み）:
 演出中のクリックは現在の待ちだけ打ち切る／`view` と `snapshot` の配列は置き換える。
@@ -2289,7 +2290,7 @@ git commit -m "feat: 文字送りと読者設定の速度を実装する"
 - Consumes: `Runtime.exec()`, `Runtime.perform()`（Task 6）、`resolveAsset()`
 - Produces: `<Stage runtime state />`（背景・立ち絵・回想効果を描く唯一の場所）
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 // tests/core/steps.test.ts
@@ -2353,12 +2354,12 @@ describe('@bg', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/core/steps.test.ts`
 Expected: FAIL（`snapshot.bg` が null のまま）
 
-- [ ] **Step 3: `runtime.exec` に `bg` を足す**
+- [x] **Step 3: `runtime.exec` に `bg` を足す**
 
 `runtime.ts` の `exec` の `switch` に加える。
 
@@ -2373,12 +2374,12 @@ Expected: FAIL（`snapshot.bg` が null のまま）
 **状態を先に更新してから待つ。** UI は新しい背景を `fadeMs` 付きで描き始め、
 コアはその時間だけ止まる。`transitionend` は見ない。
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/steps.test.ts`
 Expected: PASS（3 tests）
 
-- [ ] **Step 5: `src/engine/ui/Stage.tsx` を書く**
+- [x] **Step 5: `src/engine/ui/Stage.tsx` を書く**
 
 ```tsx
 import { useRef } from 'react'
@@ -2427,7 +2428,7 @@ CSS animation が必ず最初から走る。`fadeMs` が 0 なら一瞬で終わ
 
 **`transitionend` を待たない。** 完了の判定はコアの `perform()` が持っている。
 
-- [ ] **Step 6: `style.css` に背景のスタイルを足す**
+- [x] **Step 6: `style.css` に背景のスタイルを足す**
 
 ```css
 .wn-scene { position: absolute; inset: 0; }
@@ -2444,7 +2445,7 @@ CSS animation が必ず最初から走る。`fadeMs` が 0 なら一瞬で終わ
 .wn-bg-in { animation-name: wn-fade-in; animation-timing-function: linear; animation-fill-mode: forwards; }
 ```
 
-- [ ] **Step 7: `App.tsx` に `Stage` を差し込む**
+- [x] **Step 7: `App.tsx` に `Stage` を差し込む**
 
 ```tsx
         {started ? (
@@ -2459,7 +2460,7 @@ CSS animation が必ず最初から走る。`fadeMs` が 0 なら一瞬で終わ
 
 `import { Stage } from './Stage.tsx'` を足す。
 
-- [ ] **Step 8: 実機で確認する**
+- [x] **Step 8: 実機で確認する**
 
 ```bash
 NOVEL=kieta-ippen npm run dev
@@ -2470,7 +2471,7 @@ NOVEL=kieta-ippen npm run dev
 3. 「引き」のシーンで `black` に 1500ms でフェードする
 4. フェード中はクリックしても進まない
 
-- [ ] **Step 9: コミット**
+- [x] **Step 9: コミット**
 
 ```bash
 git add -A

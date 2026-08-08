@@ -26,6 +26,20 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
   cursor: pointer;
 }
 
+.wn-scene { position: absolute; inset: 0; }
+
+.wn-bg-layer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* フェードの尺は runtime が view.fadeMs で渡す。CSS は時間を持たない */
+@keyframes wn-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.wn-bg-in { animation-name: wn-fade-in; animation-timing-function: linear; animation-fill-mode: forwards; }
+
 .wn-title {
   position: absolute;
   inset: 0;
