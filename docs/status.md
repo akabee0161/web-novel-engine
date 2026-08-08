@@ -133,7 +133,6 @@
 
 | 項目 | 内容 |
 |---|---|
-| **`README.md` が古い** | 「実装コードはまだ1行もない」「着手前に確定させるべき仕様が10個ある」と書いてあるが、どちらも解消済み。リポジトリの顔なのでずれが目立つ |
 | `vitest.config.ts` に `exclude: ['tests/e2e/**']` | 今は `tests/e2e/` に `.test.ts` を置くと Vitest も拾ってしまう。CLAUDE.md の注意書きで回避しているが、設定で衝突を無くすほうが確実 |
 | `package.json` に `engines: { "node": ">=22" }` | 同上。`import.meta.dirname` を使うため Node 22 以上が要るが、機械的なチェックが無い |
 | `.claude/settings.local.json` の掃除 | 一時的な検証で足した許可が3件残っている |
