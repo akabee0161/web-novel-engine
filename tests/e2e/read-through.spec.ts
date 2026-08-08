@@ -284,6 +284,51 @@ test('既読はセーブ操作なしに記録され、リロードしても残�
   expect(second!.read.slice(0, 3)).toEqual(first!.read)
 })
 
+/** drafts/sample-short.wn の第1シーンの本文ブロック数 */
+const SCENE1_BLOCKS = 16
+
+test('バックログはクリック待ちのときだけ開き、シーンをまたいで遡れる', async ({ page }) => {
+  const history = page.getByRole('button', { name: '履歴' })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'はじめから' }).click()
+
+  // 冒頭の @bg のフェード中。演出中は導線ごと出さない
+  await expect(stage(page)).toHaveAttribute('data-phase', 'performing')
+  await expect(history).toHaveCount(0)
+
+  // シーン境界をまたぐところまで読む
+  const seen: string[] = []
+  for (let i = 0; i < SCENE1_BLOCKS + 1; i++) {
+    await settle(page)
+    seen.push((await body(page).textContent()) ?? '')
+    if (i === SCENE1_BLOCKS) break
+    await tap(page)
+    await expect(async () => expect(await phase(page)).not.toBe('waiting')).toPass({ timeout: 5000 })
+  }
+  const current = seen.at(-1)!
+
+  await expect(history).toBeVisible()
+  await history.click()
+
+  // 表示済みの本文が、シーンをまたいで並ぶ
+  const items = page.locator('.wn-backlog-item')
+  await expect(items).toHaveCount(seen.length)
+  // 各行はネームプレートの名前を先頭に持つので、本文を含むことだけを見る
+  const texts = await items.allTextContents()
+  for (const [n, expected] of seen.entries()) expect(texts[n]).toContain(expected)
+  expect(texts[0]).toContain(FIRST_BODY)
+  expect(texts.at(-1)).toContain(current)
+
+  // 閉じると元の位置のまま。読み返しは進行位置を動かさない
+  await page.getByRole('button', { name: '閉じる' }).click()
+  await expect(page.locator('.wn-overlay')).toHaveCount(0)
+  await expect(body(page)).toHaveText(current)
+  await tap(page)
+  await settle(page)
+  await expect(body(page)).not.toHaveText(current)
+})
+
 test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) => {
   await page.goto('/')
   for (const size of [{ width: 900, height: 1400 }, { width: 1600, height: 500 }]) {

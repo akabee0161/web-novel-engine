@@ -72,6 +72,9 @@
 | 18 | Task 12 Step 3/4 の `exec` に `default` 節あり | `default` を削除した | 10命令すべてが揃い、`switch` が網羅的になったため |
 | 19 | Task 13 Step 8「実機で確認する」が手動前提 | Playwright に1件足した（読み進めた分が `wn:kieta-ippen:system` に入り、リロードしても残る） | 逸脱10 と同じ。書き出しの契機は `pagehide` を使うため、`page.reload()` がそのまま検証になる |
 | 20 | Task 13 Step 1 のテストに設定の永続化がない | 「設定の永続化」2件を足した（`setSettings` が次回起動に残る・設定の書き出しで既読が消えない） | Step 5 の `setSettings` は `read.toArray()` を書いており、ここを `[]` にしても Step 1 のテストは全部通ってしまう |
+| 21 | Task 14 Step 1 のテストに申し送りの assert がない | 「本文を1つ表示すると `view.backlog` の参照が変わる」を足した | 申し送りが要求しているのは `view.backlog` の参照であって、`Backlog.entries()` の参照ではない。Step 1 の3件目だけではコアの組み込みを検証できない |
+| 22 | Task 14 Step 6 の `Backlog.tsx` がネームプレートの規則を自前で持つ | `ui/speaker.ts` に `displayName()` を切り出し、`MessageBox.tsx` と共用した | 「話者なしの「」は主人公」は script-syntax の規則。2箇所に写すと、片方だけ直したとき同じ行の名前が画面によって変わる |
+| 23 | Task 14 Step 9「実機で確認する」が手動前提 | Playwright に1件足した（演出中はボタンが出ない・シーンをまたいで遡れる・閉じても進行位置が動かない） | 逸脱10 と同じ |
 
 **フェーズ3 完了後に確定した仕様**（Task 10 / 11 / 14 に申し送り済み）:
 演出中のクリックは現在の待ちだけ打ち切る（**Task 11 で実装済み**）／
@@ -3570,7 +3573,7 @@ git commit -m "feat: 差し替え可能なストレージと既読の記録を�
 **バックログはスナップショットに入らない**（不変条件4の唯一の例外）。
 画面の見た目を決めないため、含めなくても復元後の画面は完全に一致する。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 // tests/core/backlog.test.ts
@@ -3635,12 +3638,12 @@ describe('積むタイミング', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/core/backlog.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: `src/engine/core/backlog.ts` を書く**
+- [x] **Step 3: `src/engine/core/backlog.ts` を書く**
 
 ```ts
 import type { BacklogEntry } from './state.ts'
@@ -3669,7 +3672,7 @@ export class Backlog {
 毎回新しい配列を作る。200件のコピーは無視できるコストで、
 購読側が参照の変化で更新を検出できるほうが価値が高い。
 
-- [ ] **Step 4: `Runtime` にバックログを組み込む**
+- [x] **Step 4: `Runtime` にバックログを組み込む**
 
 フィールドを足す。
 
@@ -3696,12 +3699,12 @@ export class Backlog {
 
 **シーン境界でクリアしない。** `enterScene` に手を入れないこと。
 
-- [ ] **Step 5: テストが通ることを確認する**
+- [x] **Step 5: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/backlog.test.ts`
 Expected: PASS（5 tests）
 
-- [ ] **Step 6: `src/engine/ui/Backlog.tsx` を書く**
+- [x] **Step 6: `src/engine/ui/Backlog.tsx` を書く**
 
 ```tsx
 import type { CompiledScript } from '../core/script.ts'
@@ -3741,7 +3744,7 @@ export function Backlog({ entries, script, onClose }: Props) {
 
 **読み返しのみ。進行位置は動かさない**（クリックしてもジャンプしない）。
 
-- [ ] **Step 7: `style.css` にオーバーレイのスタイルを足す**
+- [x] **Step 7: `style.css` にオーバーレイのスタイルを足す**
 
 ```css
 .wn-overlay {
@@ -3769,7 +3772,7 @@ export function Backlog({ entries, script, onClose }: Props) {
 .wn-backlog-name { display: inline-block; margin-right: 1cqw; opacity: 0.7; }
 ```
 
-- [ ] **Step 8: `App.tsx` にバックログを開く導線を足す**
+- [x] **Step 8: `App.tsx` にバックログを開く導線を足す**
 
 画面右上にボタンを置く。
 
@@ -3796,14 +3799,14 @@ export function Backlog({ entries, script, onClose }: Props) {
 
 `runtime.canOpenUi()` でボタン自体を出し分けるため、**演出中・文字送り中は開けない**。
 
-- [ ] **Step 9: 実機で確認する**
+- [x] **Step 9: 実機で確認する**
 
 1. クリック待ちのときだけ「履歴」ボタンが出る
 2. 押すと表示済みの本文が並ぶ
 3. シーンをまたいでも遡れる
 4. 閉じると元の位置のまま続きから読める
 
-- [ ] **Step 10: コミット**
+- [x] **Step 10: コミット**
 
 ```bash
 git add -A

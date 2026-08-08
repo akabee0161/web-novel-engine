@@ -1,5 +1,6 @@
 import type { CompiledScript } from '../core/script.ts'
 import type { EngineState } from '../core/state.ts'
+import { displayName } from './speaker.ts'
 
 type Props = {
   state: EngineState
@@ -10,10 +11,7 @@ export function MessageBox({ state, script }: Props) {
   const text = state.view.currentText
   if (!text) return null
 
-  // 話者未指定の「…」で始まる行は主人公の発話。ネームプレートに @protagonist を出す
-  // （script-syntax の「記号なしの行は出さない / 「…」は @protagonist の名前」）
-  const isProtagonistLine = text.speaker === null && text.body.startsWith('「')
-  const name = text.speaker ?? (isProtagonistLine ? script.protagonist : null)
+  const name = displayName(text, script.protagonist)
 
   return (
     <div className="wn-messagebox">

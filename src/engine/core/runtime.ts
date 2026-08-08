@@ -1,4 +1,5 @@
 import { nullAudio, type AudioPort } from './audio.ts'
+import { Backlog } from './backlog.ts'
 import { ReadSet } from './read.ts'
 import type { CompiledScript, Step } from './script.ts'
 import { charDelayMs, type Settings } from './settings.ts'
@@ -32,6 +33,7 @@ export class Runtime {
   protected readonly storage: Storage
   protected readonly system: SystemStore
   protected readonly read: ReadSet
+  protected readonly backlog = new Backlog()
 
   private state: EngineState
   private listeners = new Set<() => void>()
@@ -94,6 +96,11 @@ export class Runtime {
     // 設定変更は数が少なく、次の起動に残らないと読者が困る。ここだけは即座に書き出す
     this.system.save({ read: this.read.toArray(), settings: s })
     this.emit()
+  }
+
+  /** バックログ・セーブ UI を開いてよいか。セーブ可能点とまったく同じ条件 */
+  canOpenUi(): boolean {
+    return this.state.view.phase === 'waiting'
   }
 
   isRead(hash: string): boolean {
@@ -236,6 +243,10 @@ export class Runtime {
   private async execText(step: Extract<Step, { t: 'text' }>): Promise<void> {
     // セーブ操作とは無関係に、本文を表示した瞬間に記録する
     this.read.add(step.h)
+    // バックログはシーン境界でクリアしない（enterScene に手を入れないこと）。
+    // entries() は毎回新しい配列なので、購読側から見て参照が変わる
+    this.backlog.push({ speaker: step.speaker, body: step.body })
+    this.state.view.backlog = this.backlog.entries()
     this.state.progress.index = step.i
     this.state.view.currentText = { speaker: step.speaker, body: step.body }
     this.state.view.visibleChars = 0

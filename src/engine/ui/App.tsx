@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Runtime } from '../core/runtime.ts'
+import { Backlog } from './Backlog.tsx'
 import { MessageBox } from './MessageBox.tsx'
 import { Stage } from './Stage.tsx'
 import { Title } from './Title.tsx'
@@ -8,6 +9,8 @@ import { useEngine } from './useEngine.ts'
 export function App({ runtime }: { runtime: Runtime }) {
   // 「タイトル画面か本編か」はエンジンの状態ではなく画面の状態なので useState でよい
   const [started, setStarted] = useState(false)
+  // 開いている UI も画面の状態。エンジンの状態ではないので useState でよい
+  const [ui, setUi] = useState<'none' | 'backlog'>('none')
   const state = useEngine(runtime)
 
   const start = () => {
@@ -42,6 +45,22 @@ export function App({ runtime }: { runtime: Runtime }) {
           <>
             <Stage runtime={runtime} state={state} />
             <MessageBox state={state} script={runtime.script} />
+            {/* 演出中・文字送り中は導線ごと出さない。開ける条件はセーブ可能点と同じ */}
+            {ui === 'none' && runtime.canOpenUi() && (
+              <button
+                className="wn-button wn-corner"
+                onClick={(e) => { e.stopPropagation(); setUi('backlog') }}
+              >
+                履歴
+              </button>
+            )}
+            {ui === 'backlog' && (
+              <Backlog
+                entries={state.view.backlog}
+                script={runtime.script}
+                onClose={() => setUi('none')}
+              />
+            )}
           </>
         ) : (
           <Title title={runtime.script.title} onStart={start} />
