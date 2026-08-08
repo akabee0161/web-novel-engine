@@ -264,6 +264,14 @@ export class Runtime {
     await this.runFrom(0, 0)
   }
 
+  /**
+   * 指定のシーン・本文ブロックから開始する。セーブの復元とまったく同じ経路を通る。
+   * 開発用だが、実装はロードそのものなので専用のコードはほとんど無い。
+   */
+  async startAt(scene: string, index: number): Promise<void> {
+    await this.load({ scene, index, snapshot: this.state.snapshot })
+  }
+
   /** 指定のシーン・step 位置から台本の終端まで再生する */
   protected async runFrom(sceneIdx: number, pc: number): Promise<void> {
     const gen = ++this.generation

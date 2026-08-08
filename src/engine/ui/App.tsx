@@ -21,6 +21,22 @@ export function App({ runtime }: { runtime: Runtime }) {
     // await を挟まず同期的に呼ぶ。挟むとユーザージェスチャの資格が切れる
     runtime.unlockAudio()
     setStarted(true)
+
+    // 開発時に途中から確認するための入口。Vite の定数畳み込みで本番ビルドには残らない
+    if (import.meta.env.DEV) {
+      const params = new URLSearchParams(location.search)
+      const scene = params.get('scene')
+      if (scene) {
+        // index はシーン内のローカル連番なので、scene と対でのみ意味を持つ
+        const index = Number(params.get('index') ?? 0)
+        void runtime.startAt(scene, Number.isFinite(index) ? index : 0)
+          .catch((e: unknown) => {
+            setStarted(false)
+            alert(e instanceof Error ? e.message : String(e))
+          })
+        return
+      }
+    }
     void runtime.start()
   }
 

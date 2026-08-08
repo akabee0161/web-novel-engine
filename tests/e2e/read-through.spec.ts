@@ -484,6 +484,29 @@ test('枠に収まらない本文はページに分かれ、文字を落とさ�
   expect(await body(page).textContent()).not.toBe(pages.at(-1))
 })
 
+test('開発用の ?scene=&index= で途中から始められる', async ({ page }) => {
+  await page.goto('/?scene=' + encodeURIComponent('屋上前') + '&index=2')
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await settle(page)
+
+  expect(await body(page).textContent()).toBe('「じゃあ確認すれば──」')
+  // セーブの復元と同じ経路を通るので、シーン入口からのリプレイで演出が効いている
+  await expect(bgLayer(page)).toHaveAttribute('data-bg', 'rooftop_door')
+  expect(await readSprites(page)).not.toEqual([])
+})
+
+test('存在しないシーンを指定したら、黙って先頭から始めずに失敗として出る', async ({ page }) => {
+  const dialogs: string[] = []
+  page.on('dialog', (d) => { dialogs.push(d.message()); void d.dismiss() })
+
+  await page.goto('/?scene=' + encodeURIComponent('無いシーン'))
+  await page.getByRole('button', { name: 'はじめから' }).click()
+
+  await expect(async () => expect(dialogs).toHaveLength(1)).toPass({ timeout: 5000 })
+  expect(dialogs[0]).toContain('無いシーン')
+  await expect(page.locator('.wn-title')).toBeVisible()
+})
+
 test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) => {
   await page.goto('/')
   for (const size of [{ width: 900, height: 1400 }, { width: 1600, height: 500 }]) {

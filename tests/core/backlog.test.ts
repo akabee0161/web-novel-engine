@@ -70,4 +70,13 @@ describe('積むタイミング', () => {
     await vi.waitFor(() => expect(r.getState().view.phase).toBe('waiting'))
     expect(r.canOpenUi()).toBe(true)
   })
+
+  it('文字送り中は UI を開けない', async () => {
+    const r = new Runtime({ script, novelId: 'n', baseUrl: 'https://x.test/' })
+    r.setSettings({ ...DEFAULT_SETTINGS, textSpeed: 'slow' })
+    void r.start()
+    await vi.waitFor(() => expect(r.getState().view.phase).toBe('typing'))
+    expect(r.canOpenUi()).toBe(false)
+    expect(r.canSave()).toBe(false)
+  })
 })

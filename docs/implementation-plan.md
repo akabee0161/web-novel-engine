@@ -25,7 +25,7 @@
 [完了] フェーズ3  最小UI（ここで動く）      Task 7-8
 [完了] フェーズ4  命令を1つずつ           Task 9-12
 [完了] フェーズ5  既読・バックログ・セーブ  Task 13-16
-[  ] フェーズ6  ページ送りと仕上げ        Task 17-18
+[完了] フェーズ6  ページ送りと仕上げ        Task 17-18
 ```
 
 ## グローバル制約
@@ -88,6 +88,9 @@
 | 34 | Task 17 Step 8「実機で確認する」が台本に長い行を一時的に足す前提 | Playwright で `.wn-messagebox` の `font-size` を上書きし、既存の本文を溢れさせた。ページの連結が元の本文と一致することまで見る | 台本は作品そのものなので、確認のために書き換えたくない。逸脱10 と同じく E2E に残す |
 | 35 | Task 17 Step 1 の `advance()` 後の待ち合わせ | ページ番号が変わるまで待つ `nextPage()` にした | 逸脱24 と同じ理由。既存の `typing.test.ts` も測定待ちの await が1つ増えたことで不安定になったため、購読で全 emit を拾う形に書き換えた |
 | 36 | — | E2E の本文ロケータ `.wn-messagebox > div:last-child` を `.wn-body` に変えた | 測定用の `.wn-measure` が最後の子になり、**常に全文**を持つため掴む対象が入れ替わっていた |
+| 37 | Task 18 Step 3「実機で確認する」が手動前提 | Playwright に2件足した（`?scene=&index=` で途中から始まる・存在しないシーンは黙って先頭から始めずに失敗として出る） | 逸脱10 と同じ。dev サーバで走るので `import.meta.env.DEV` の分岐がそのまま踏める |
+| 38 | Task 18 Step 7 が新しい決定記録に「着手前に確定させた10項目」を書く前提 | 10項目は[2026-08-08 の記録](decisions/2026-08-08-pre-implementation-decisions.md)に既にあるため、[2026-08-09 の記録](decisions/2026-08-09-implementation-decisions.md)には**実装して初めて判断が必要になった8件**を書いた | 同じ内容の記録を2つ作ると、どちらが正か分からなくなる。決定記録は凍結文書なので統合もできない |
+| 39 | Task 18 Step 5 の通し確認に、テストが無い項目が1つあった | 「文字送り中は UI を開けない」を core のテストに足した | `canOpenUi()` / `canSave()` が `typing` で false になることを固定していなかった。完了の定義に含まれる項目なので手動確認では残せない |
 
 **フェーズ3 完了後に確定した仕様**（Task 10 / 11 / 14 に申し送り済み）:
 演出中のクリックは現在の待ちだけ打ち切る（**Task 11 で実装済み**）／
@@ -4971,7 +4974,7 @@ git commit -m "feat: メッセージ枠に収まらない本文の自動ペー�
 - Consumes: `runtime.load()`（Task 15）
 - Produces: `runtime.startAt(scene: string, index: number): Promise<void>`
 
-- [ ] **Step 1: `Runtime` に開始位置指定を足す**
+- [x] **Step 1: `Runtime` に開始位置指定を足す**
 
 ```ts
   /**
@@ -4983,7 +4986,7 @@ git commit -m "feat: メッセージ枠に収まらない本文の自動ペー�
   }
 ```
 
-- [ ] **Step 2: `App.tsx` で URL パラメータを読む**
+- [x] **Step 2: `App.tsx` で URL パラメータを読む**
 
 ```tsx
   const start = () => {
@@ -5008,7 +5011,7 @@ git commit -m "feat: メッセージ枠に収まらない本文の自動ペー�
 `import.meta.env.DEV` で囲むため、**本番ビルドにはこの分岐が残らない**
 （Vite が定数畳み込みで落とす）。
 
-- [ ] **Step 3: 動作を確認する**
+- [x] **Step 3: 動作を確認する**
 
 ```bash
 NOVEL=kieta-ippen npm run dev
@@ -5020,7 +5023,7 @@ NOVEL=kieta-ippen npm run dev
 2. 背景 `rooftop_door` と立ち絵が復元されている
 3. リプレイ中に SE が鳴らない
 
-- [ ] **Step 4: 本番ビルドに含まれないことを確認する**
+- [x] **Step 4: 本番ビルドに含まれないことを確認する**
 
 ```bash
 NOVEL=kieta-ippen npm run build
@@ -5029,7 +5032,7 @@ grep -r "params.get('scene')" dist/kieta-ippen/ || echo "本番ビルドに含�
 
 Expected: 「本番ビルドに含まれていない」と出る
 
-- [ ] **Step 5: 通しで読んで確認する**
+- [x] **Step 5: 通しで読んで確認する**
 
 ```bash
 NOVEL=kieta-ippen npm run build
@@ -5050,7 +5053,7 @@ npx vite preview --outDir dist/kieta-ippen
 | 演出中・文字送り中はセーブUIとバックログが開けない | engine-spec |
 | ウィンドウをどんな比率にしてもレターボックスで 16:9 が保たれる | architecture |
 
-- [ ] **Step 6: 全チェックを走らせる**
+- [x] **Step 6: 全チェックを走らせる**
 
 ```bash
 npm run typecheck && npm run lint && npm test && NOVEL=kieta-ippen npm run build
@@ -5058,7 +5061,7 @@ npm run typecheck && npm run lint && npm test && NOVEL=kieta-ippen npm run build
 
 Expected: すべて PASS
 
-- [ ] **Step 7: ドキュメントを更新する**
+- [x] **Step 7: ドキュメントを更新する**
 
 **着手前に確定させた10個の仕様**（この計画の冒頭）を、正式なドキュメントに反映する。
 
@@ -5072,7 +5075,7 @@ Expected: すべて PASS
 
 **決定記録は書き換えない。** 新しい決定は新しいファイルを足す。
 
-- [ ] **Step 8: コミット**
+- [x] **Step 8: コミット**
 
 ```bash
 git add -A
@@ -5085,12 +5088,12 @@ git commit -m "feat: 開発用の開始位置指定を追加し、初期実装�
 
 以下がすべて満たされたら初期実装は完了とする。
 
-- [ ] `npm run typecheck` / `npm run lint` / `npm test` がすべて通る
-- [ ] `NOVEL=kieta-ippen npm run build` が通り、`dist/kieta-ippen/` が自己完結している
-- [ ] `drafts/sample-short.wn` を先頭から末尾まで通しで読める
-- [ ] architecture.md のテスト一覧の9項目がすべてテストで固定されている
-- [ ] engine-spec.md の不変条件4つがコードで守られている
-- [ ] 着手前に確定させた10個の仕様がドキュメントに反映されている
+- [x] `npm run typecheck` / `npm run lint` / `npm test` がすべて通る
+- [x] `NOVEL=kieta-ippen npm run build` が通り、`dist/kieta-ippen/` が自己完結している
+- [x] `drafts/sample-short.wn` を先頭から末尾まで通しで読める
+- [x] architecture.md のテスト一覧の9項目がすべてテストで固定されている
+- [x] engine-spec.md の不変条件4つがコードで守られている
+- [x] 着手前に確定させた10個の仕様がドキュメントに反映されている
 
 ## この計画が扱わないもの
 
