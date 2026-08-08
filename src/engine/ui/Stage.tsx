@@ -38,6 +38,25 @@ export function Stage({ runtime, state }: Props) {
           style={{ backgroundImage: url(bg), animationDuration: `${fadeMs}ms` }}
         />
       )}
+
+      {state.snapshot.sprites.map((sprite) => {
+        const href = runtime.resolveAsset(`chara/${sprite.id}_${sprite.expr}`)
+        if (!href) {
+          // 表情を省略した @show はビルド時に検査できないため、ここで初めて欠落が分かる
+          console.warn(`立ち絵が見つからない: chara/${sprite.id}_${sprite.expr}`)
+          return null
+        }
+        return (
+          <img
+            key={sprite.id}
+            className={`wn-sprite wn-sprite-${sprite.pos}`}
+            data-sprite={sprite.id}
+            data-expr={sprite.expr}
+            src={href}
+            alt=""
+          />
+        )
+      })}
     </div>
   )
 }

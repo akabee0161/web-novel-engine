@@ -11,6 +11,15 @@ const speaker = (page: Page) => page.locator('.wn-speaker')
 /** 手前に出ている背景レイヤ。data-bg に @bg の引数が入る */
 const bgLayer = (page: Page) => page.locator('.wn-bg-in')
 
+/** 出ている立ち絵を `id:表情:位置` の並びで取る */
+const readSprites = (page: Page) =>
+  page.locator('.wn-sprite').evaluateAll((els) =>
+    els.map((el) => {
+      const pos = /wn-sprite-(\w+)/.exec(el.className)?.[1] ?? '?'
+      return `${el.getAttribute('data-sprite')}:${el.getAttribute('data-expr')}:${pos}`
+    }),
+  )
+
 const phase = (page: Page) => stage(page).getAttribute('data-phase')
 
 /** ステージのどこでもよいが、メッセージ枠を避けて上部を押す */
@@ -28,7 +37,7 @@ async function settle(page: Page) {
   await expect(stage(page)).toHaveAttribute('data-phase', /waiting|ended/)
 }
 
-type Block = { body: string; speaker: string | null; bg: string | null }
+type Block = { body: string; speaker: string | null; bg: string | null; sprites: string[] }
 
 /** 台本を終端まで読み進め、通過した本文ブロックを記録する */
 async function readAll(page: Page): Promise<Block[]> {
@@ -40,6 +49,7 @@ async function readAll(page: Page): Promise<Block[]> {
       body: (await body(page).textContent()) ?? '',
       speaker: (await speaker(page).count()) ? await speaker(page).textContent() : null,
       bg: (await bgLayer(page).count()) ? await bgLayer(page).getAttribute('data-bg') : null,
+      sprites: await readSprites(page),
     })
     await tap(page)
     // クリックが効いて次に移ったことを確かめてから、次の周回に入る
@@ -81,15 +91,20 @@ test('ネームプレートは話者と主人公で出し分けられる', async
 test('文字送りは1文字ずつ進み、クリックで全文表示になって止まる', async ({ page }) => {
   await startReading(page)
 
+  // 1文字 40ms なので FIRST_BODY は約 840ms で打ち終わる。
+  // 計測に使う時間はその予算を大きく下回らせる（超えると tap が「打ち切り」ではなく
+  // 「次のブロックへ送る」クリックになり、掴む本文がずれる）
   const samples: string[] = []
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 3; i++) {
     samples.push((await body(page).textContent()) ?? '')
-    await page.waitForTimeout(90)
+    await page.waitForTimeout(60)
   }
   expect(samples.at(-1)!.length).toBeGreaterThan(samples[0].length)
   expect(samples.at(-1)!.length).toBeLessThan(FIRST_BODY.length)
 
   // クリックすると全文が出て、そこで止まる（次に進まない）
+  // ここが typing でなければ以降の前提が崩れるので、先に明示して落とす
+  expect(await phase(page)).toBe('typing')
   await tap(page)
   await expect(stage(page)).toHaveAttribute('data-phase', 'waiting')
   await expect(body(page)).toHaveText(FIRST_BODY)
@@ -114,6 +129,32 @@ test('背景は台本の @bg どおりに切り替わる', async ({ page }) => {
     'rooftop_door',      // 屋上前
     'black',             // 引き
   ])
+})
+
+test('立ち絵は @show / @hide どおりに出入りする', async ({ page }) => {
+  const warnings: string[] = []
+  page.on('console', (m) => m.type() === 'warning' && warnings.push(m.text()))
+
+  await startReading(page)
+  const blocks = await readAll(page)
+
+  // 同じ並びが続く区間を畳んで、変わった順に並べる
+  const order = blocks
+    .map((b) => b.sprites.join(' + '))
+    .filter((s, i, all) => s !== all[i - 1])
+
+  expect(order[0]).toBe('')                                  // 冒頭はまだ誰も出ていない
+  expect(order[1]).toBe('mika:normal:center')                // @show mika normal pos:center
+  expect(order).toContain('mika:smile:center')               // @show mika smile は位置を維持
+  // トオルの登場と同時にミカが左へ寄る
+  expect(order).toContain('mika:smile:left + tooru:normal:right')
+  expect(order.at(-1)).toBe('')                              // 「引き」の @hide *
+  // @hide * で空に戻ったあと、回想で再び出る
+  expect(order.filter((s) => s === '').length).toBeGreaterThan(1)
+  expect(order.filter((s) => s === 'mika:normal:center').length).toBeGreaterThan(1)
+
+  // 素材の欠落は console.warn になる。ダミー素材が揃っている限り出ない
+  expect(warnings).toEqual([])
 })
 
 test('フェード中はクリックしても進まない', async ({ page }) => {

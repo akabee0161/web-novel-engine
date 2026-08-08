@@ -23,7 +23,7 @@
 [完了] フェーズ1  土台と最小パーサ          Task 1-4
 [完了] フェーズ2  コアの骨格                Task 5-6
 [完了] フェーズ3  最小UI（ここで動く）      Task 7-8
-[途中] フェーズ4  命令を1つずつ           Task 9 完了 / 10-12
+[途中] フェーズ4  命令を1つずつ           Task 9-10 完了 / 11-12
 [  ] フェーズ5  既読・バックログ・セーブ  Task 13-16
 [  ] フェーズ6  ページ送りと仕上げ        Task 17-18
 ```
@@ -62,6 +62,8 @@
 | 8 | 素材ディレクトリは `<作品ディレクトリ>/public` に固定 | `novel.config.json` で差し替え可能にした（既定は同じ） | 実素材をリポジトリの外に置けるようにするため。[2026-08-08 の決定](decisions/2026-08-08-asset-location-and-verification.md) |
 | 9 | `.wn-stage` に属性なし | `data-phase` を出すようにした | E2E が文字送りの途中を掴んで不安定になる。CSS の演出フックとしても要る |
 | 10 | Task 9 Step 8「実機で確認する」が手動前提 | Playwright に2件足した（背景の切替順・フェード中のクリック） | 逸脱7 と同じ。あわせて背景レイヤに `data-bg` を出した（E2E から背景名を取るため。逸脱9 の `data-phase` と同じ扱い） |
+| 11 | Task 10 Step 7「実機で確認する」が手動前提 | Playwright に1件足した（立ち絵の出入りと位置）。立ち絵に `data-sprite` / `data-expr` を出した | 逸脱10 と同じ |
+| 12 | — | 既存 E2E「文字送りは1文字ずつ進み…」の計測を 5回×90ms → 3回×60ms に縮め、tap 直前に `phase === 'typing'` を明示した | E2E が8本になって並列負荷が上がり、計測ループが文字送りの予算（21文字×40ms=840ms）を超えて 3回中2回落ちた。掴む本文がずれるだけで実装の不具合ではない |
 
 **フェーズ3 完了後に確定した仕様**（Task 10 / 11 / 14 に申し送り済み）:
 演出中のクリックは現在の待ちだけ打ち切る／`view` と `snapshot` の配列は置き換える。
@@ -2495,7 +2497,7 @@ git commit -m "feat: @bg の背景切替とクロスフェードを実装する"
 > `emit()` は3層を浅くコピーするだけなので、配列を mutate すると参照が変わらず React が再描画しない。
 > **`@show` の前後で `snapshot.sprites` の参照が変わることを assert するテストを1つ足すこと。**
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 describe('@show / @hide', () => {
@@ -2552,12 +2554,12 @@ describe('@show / @hide', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/core/steps.test.ts`
 Expected: FAIL（`sprites` が空のまま）
 
-- [ ] **Step 3: `runtime.exec` に `show` / `hide` を足す**
+- [x] **Step 3: `runtime.exec` に `show` / `hide` を足す**
 
 ```ts
       case 'show': {
@@ -2589,12 +2591,12 @@ Expected: FAIL（`sprites` が空のまま）
 **配列を mutate しない。** `emit()` は3層を浅くコピーするだけなので、
 配列の中身を書き換えると購読側から見て変化しない。
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/steps.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: `Stage.tsx` に立ち絵を足す**
+- [x] **Step 5: `Stage.tsx` に立ち絵を足す**
 
 `Stage` の戻り値の `.wn-scene` の中、背景レイヤーの後ろに加える。
 
@@ -2617,7 +2619,7 @@ Expected: PASS
       })}
 ```
 
-- [ ] **Step 6: `style.css` に立ち絵のスタイルを足す**
+- [x] **Step 6: `style.css` に立ち絵のスタイルを足す**
 
 ```css
 .wn-sprite {
@@ -2637,7 +2639,7 @@ Expected: PASS
 「時間の権威はコア」という原則に反しない。`@show` に待ち時間の指定がなく、
 コアは位置変更で `perform()` を呼ばずに次へ進む。
 
-- [ ] **Step 7: 実機で確認する**
+- [x] **Step 7: 実機で確認する**
 
 ```bash
 NOVEL=kieta-ippen npm run dev
@@ -2649,7 +2651,7 @@ NOVEL=kieta-ippen npm run dev
 4. 「廊下」の `@hide *` で全員消える
 5. 「回想・昨日の部室」で再びミカが出る
 
-- [ ] **Step 8: コミット**
+- [x] **Step 8: コミット**
 
 ```bash
 git add -A

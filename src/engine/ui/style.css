@@ -40,6 +40,20 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
 @keyframes wn-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .wn-bg-in { animation-name: wn-fade-in; animation-timing-function: linear; animation-fill-mode: forwards; }
 
+/* 位置の移動だけは CSS の transition に任せる。@show には待ち時間の指定がなく、
+   コアは位置変更で perform() を呼ばずに次へ進むため、完了判定には使っていない */
+.wn-sprite {
+  position: absolute;
+  bottom: 0;
+  height: 88cqh;
+  width: auto;
+  transition: left 400ms ease, opacity 300ms linear;
+  transform: translateX(-50%);
+}
+.wn-sprite-left   { left: 24%; }
+.wn-sprite-center { left: 50%; }
+.wn-sprite-right  { left: 76%; }
+
 .wn-title {
   position: absolute;
   inset: 0;

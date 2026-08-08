@@ -117,8 +117,35 @@ export class Runtime {
         this.emit()
         await this.perform(step.fade)
         break
+      case 'show': {
+        // 配列は mutate しない。emit() は3層を浅くコピーするだけなので、
+        // 中身を書き換えると参照が変わらず購読側から見て変化しない
+        const sprites = [...this.state.snapshot.sprites]
+        const at = sprites.findIndex((s) => s.id === step.id)
+        if (at < 0) {
+          // 初出。省略された項目は既定値
+          sprites.push({ id: step.id, expr: step.expr ?? 'normal', pos: step.pos ?? 'center' })
+        } else {
+          // 既出。省略された項目は現在値を維持する
+          sprites[at] = {
+            id: step.id,
+            expr: step.expr ?? sprites[at].expr,
+            pos: step.pos ?? sprites[at].pos,
+          }
+        }
+        this.state.snapshot.sprites = sprites
+        this.emit()
+        break
+      }
+
+      case 'hide':
+        this.state.snapshot.sprites =
+          step.id === null ? [] : this.state.snapshot.sprites.filter((s) => s.id !== step.id)
+        this.emit()
+        break
+
       default:
-        // 残りの演出命令は Task 10 以降で足す
+        // 残りの演出命令は Task 11 以降で足す
         break
     }
   }
