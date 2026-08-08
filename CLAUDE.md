@@ -36,7 +36,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## コマンド
 
 **Node 22 以上。** `vite.config.ts` / `vitest.config.ts` が `import.meta.dirname` を使う。
-`package.json` に `engines` フィールドが無いため、古い Node でも `npm install` は通ってしまう。
+`package.json` の `engines` に書いてあるが、npm は既定では警告（EBADENGINE）を出すだけで
+インストールを止めない。古い Node で動かすと実行時に落ちる。
 
 ```bash
 NOVEL=kieta-ippen npm run dev     # 開発サーバ（NOVEL は必須）
@@ -50,9 +51,11 @@ npm run typecheck
 npm run gen:assets  # 1作目のダミー素材を再生成する
 ```
 
-**拡張子で走らせる側が決まる。** `tests/**/*.test.ts` は Vitest、`tests/e2e/**/*.spec.ts` は
-Playwright。`tests/e2e/` に `.test.ts` を置くと **Vitest も拾ってしまい**、
-ブラウザ無しで実行されて必ず落ちる。
+**拡張子と置き場所で走らせる側が決まる。** `tests/**/*.test.ts` は Vitest、
+`tests/e2e/**` は Playwright。`vitest.config.ts` が `tests/e2e/**` を除外しているため、
+`tests/e2e/` に `.test.ts` を置いても Vitest は拾わず、Playwright だけが走る
+（Playwright の既定の `testMatch` は `.spec.ts` と `.test.ts` の両方に当たる）。
+命名は `.spec.ts` で揃える。
 
 **コードを変えたら `npm run typecheck && npm run lint && npm test` を通してから報告する。**
 DOM に関わる変更（UI・演出・ページ分割）は `npm run test:e2e` も走らせる。

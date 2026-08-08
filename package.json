@@ -4,6 +4,9 @@
   "description": "ブラウザで動作するサウンドノベル / ビジュアルノベルエンジン。",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "license": "ISC",
   "repository": {
     "type": "git",

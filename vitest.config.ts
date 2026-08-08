@@ -5,6 +5,8 @@ import { resolve } from 'node:path'
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
+    // tests/e2e/ は Playwright の担当。ここに .test.ts を置いても Vitest は拾わない
+    exclude: ['tests/e2e/**'],
     environment: 'node',
   },
   resolve: {
