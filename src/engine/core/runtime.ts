@@ -1,10 +1,11 @@
 import { nullAudio, type AudioPort } from './audio.ts'
 import { Backlog } from './backlog.ts'
 import { ReadSet } from './read.ts'
+import { LoadError, parseSave, serializeSave, type SaveData, type SaveMeta } from './save.ts'
 import type { CompiledScript, Step } from './script.ts'
 import { charDelayMs, type Settings } from './settings.ts'
 import { initialState, type EngineState, type Snapshot } from './state.ts'
-import { SystemStore, memoryStorage, type Storage } from './storage.ts'
+import { SystemStore, memoryStorage, saveKey, type Storage } from './storage.ts'
 
 export type RuntimeOptions = {
   script: CompiledScript
@@ -46,6 +47,15 @@ export class Runtime {
 
   /** リプレイ中は待ち時間を一切消費しない */
   protected replaying = false
+  /** リプレイの終了地点。この連番の本文に到達したら通常再生に戻る */
+  private replayTarget = -1
+  /**
+   * 実行中の再生ループの世代。ロードで打ち切るために使う。
+   * 増やしただけでは古いループは待ちの中で止まったままなので、
+   * 打ち切る側が待ちも解くこと（`abortRun()`）。
+   */
+  private generation = 0
+  private readonly slots = ['auto', '1', '2', '3'] as const
   /** シーン入口のスナップショット。セーブはこれを書き出す */
   protected sceneEntry: Snapshot
   protected sceneIdx = 0
@@ -103,6 +113,89 @@ export class Runtime {
     return this.state.view.phase === 'waiting'
   }
 
+  canSave(): boolean {
+    return this.state.view.phase === 'waiting'
+  }
+
+  get saveSlots(): readonly string[] {
+    return this.slots
+  }
+
+  makeSave(): SaveData {
+    return {
+      scene: this.state.progress.scene,
+      // 「シーンに入った瞬間」の値であって「セーブした瞬間」の値ではない。
+      // リプレイが入口から再実行して現在の状態に着地させる
+      snapshot: structuredClone(this.sceneEntry),
+      index: this.state.progress.index,
+    }
+  }
+
+  saveTo(slot: string): void {
+    if (!this.canSave()) throw new Error('セーブできるのはクリック待ちの瞬間だけ')
+    const preview = this.state.view.currentText?.body ?? ''
+    this.storage.set(saveKey(this.novelId, slot), serializeSave(this.makeSave(), preview))
+  }
+
+  listSaves(): SaveMeta[] {
+    const list: SaveMeta[] = []
+    for (const slot of this.slots) {
+      const data = parseSave(this.storage.get(saveKey(this.novelId, slot)))
+      if (!data) continue
+      list.push({
+        slot,
+        scene: data.scene,
+        index: data.index,
+        savedAt: data.savedAt,
+        preview: data.preview,
+      })
+    }
+    return list
+  }
+
+  async loadFrom(slot: string): Promise<void> {
+    const data = parseSave(this.storage.get(saveKey(this.novelId, slot)))
+    if (!data) throw new LoadError('セーブデータが読めない')
+    await this.load({ scene: data.scene, snapshot: data.snapshot, index: data.index })
+  }
+
+  /**
+   * セーブ時の画面を再現する。
+   * スナップショットを復元 → 0 から index-1 までを演出スキップでリプレイ
+   * → index を通常表示してクリック待ち。
+   *
+   * 呼べるのはクリック待ち（`canOpenUi()`）か、まだ再生を始めていないときだけ。
+   * 文字送りの最中に呼ぶと、打ち切った側の文字送りが状態を上書きしうる。
+   */
+  async load(save: SaveData): Promise<void> {
+    const sceneIdx = this.script.scenes.findIndex((s) => s.id === save.scene)
+    if (sceneIdx < 0) {
+      // 黙って別の位置に飛ばさない
+      throw new LoadError(`セーブされたシーンが台本に存在しない: ${save.scene}`)
+    }
+    const scene = this.script.scenes[sceneIdx]
+    const blocks = scene.steps.filter((s) => s.t === 'text').length
+    if (blocks === 0) throw new LoadError(`シーンに本文が1つもない: ${save.scene}`)
+
+    this.abortRun()
+
+    this.state.snapshot = structuredClone(save.snapshot)
+    this.state.view.currentText = null
+    this.state.view.visibleChars = 0
+    this.backlog.clear()
+    this.state.view.backlog = this.backlog.entries()
+
+    // index がブロック数を超えていたら最後のブロックにクランプする
+    this.replayTarget = Math.min(save.index, blocks - 1)
+    this.replaying = true
+    try {
+      await this.runFrom(sceneIdx, 0)
+    } finally {
+      this.replaying = false
+      this.replayTarget = -1
+    }
+  }
+
   isRead(hash: string): boolean {
     return this.read.has(hash)
   }
@@ -140,6 +233,7 @@ export class Runtime {
 
   /** 指定のシーン・step 位置から台本の終端まで再生する */
   protected async runFrom(sceneIdx: number, pc: number): Promise<void> {
+    const gen = ++this.generation
     for (let s = sceneIdx; s < this.script.scenes.length; s++) {
       const scene = this.script.scenes[s]
       this.sceneIdx = s
@@ -147,10 +241,26 @@ export class Runtime {
       for (let p = s === sceneIdx ? pc : 0; p < scene.steps.length; p++) {
         this.state.progress.pc = p
         await this.exec(scene.steps[p])
+        // ロードで別の再生が始まっていたら、ここで黙って降りる
+        if (gen !== this.generation) return
       }
     }
     this.state.view.phase = 'ended'
     this.emit()
+  }
+
+  /**
+   * 走っている再生ループを打ち切る。
+   * 世代を進めたうえで待ちを解き、古いループが `runFrom` の判定まで進めるようにする。
+   */
+  private abortRun(): void {
+    this.generation++
+    const click = this.clickResolve
+    this.clickResolve = null
+    click?.()
+    const cancel = this.performCancel
+    this.performCancel = null
+    cancel?.()
   }
 
   /** シーンに入った瞬間の状態を控える。ここがセーブの復元起点になる */
@@ -162,6 +272,12 @@ export class Runtime {
   }
 
   protected async exec(step: Step): Promise<void> {
+    if (this.replaying && step.t === 'text' && step.i === this.replayTarget) {
+      // ここから通常再生。この本文は文字送りされ、クリック待ちになる
+      this.replaying = false
+      // リプレイ中は state だけ動かしていたので、実際の再生をここで1度だけ合わせる
+      this.audio.syncBgm(this.state.snapshot.bgm, 0)
+    }
     switch (step.t) {
       case 'text':
         await this.execText(step)

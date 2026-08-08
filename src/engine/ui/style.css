@@ -111,8 +111,9 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
   border-radius: 0.7cqw;
 }
 
-/* クリック待ちのときだけ出る。押すとバックログが開く */
-.wn-corner { position: absolute; top: 2cqw; right: 2cqw; font-size: 1.8cqw; padding: 0.8cqw 2cqw; }
+/* クリック待ちのときだけ出る操作ボタン群 */
+.wn-corner { position: absolute; top: 2cqw; right: 2cqw; display: flex; gap: 1cqw; }
+.wn-corner .wn-button { font-size: 1.8cqw; padding: 0.8cqw 2cqw; }
 
 .wn-overlay {
   position: absolute;
@@ -137,3 +138,23 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
 .wn-backlog-list { overflow-y: auto; line-height: 1.8; }
 .wn-backlog-item { margin: 0 0 1.4cqw; }
 .wn-backlog-name { display: inline-block; margin-right: 1cqw; opacity: 0.7; }
+
+.wn-slots { display: flex; flex-direction: column; gap: 1.2cqw; overflow-y: auto; }
+.wn-slot {
+  display: grid;
+  grid-template-columns: 12cqw 16cqw 1fr auto;
+  gap: 1.5cqw;
+  align-items: baseline;
+  padding: 1.4cqw 2cqw;
+  font: inherit;
+  font-size: 1.9cqw;
+  text-align: left;
+  color: #f2f2f2;
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.12cqw solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.6cqw;
+  cursor: pointer;
+}
+.wn-slot:disabled { opacity: 0.35; cursor: default; }
+.wn-slot-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85; }
+.wn-slot-time, .wn-slot-empty { opacity: 0.55; font-size: 1.6cqw; }

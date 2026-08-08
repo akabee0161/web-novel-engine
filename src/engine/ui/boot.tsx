@@ -28,6 +28,15 @@ export function boot(opts: BootOptions): void {
     baseUrl,
     audio: new WebAudio(resolve),
     storage: browserStorage(),
+    onSaveable: () => {
+      // セーブ可能点に到達するたびに打つ。定義がそのままタイミングになるので、
+      // 「フェード中にオートセーブを打たない」が構造的に満たされる
+      try {
+        runtime.saveTo('auto')
+      } catch (e) {
+        console.warn('オートセーブに失敗した', e)
+      }
+    },
   })
 
   // 既読は本文1ブロックごとに増える。1ブロックごとに localStorage を触ると

@@ -329,6 +329,80 @@ test('バックログはクリック待ちのときだけ開き、シーンを�
   await expect(body(page)).not.toHaveText(current)
 })
 
+/** セーブ/ロードのスロット。並びは runtime.saveSlots（auto, 1, 2, 3） */
+const slot = (page: Page, n: number) => page.locator('.wn-slot').nth(n)
+
+test('セーブした画面が、リロードをまたいで「つづきから」で再現される', async ({ page }) => {
+  await startReading(page)
+
+  // シーン境界をまたぐところまで読む。背景と立ち絵の持ち越しごと復元されることを見る
+  for (let i = 0; i < SCENE1_BLOCKS; i++) {
+    await settle(page)
+    await tap(page)
+    await expect(async () => expect(await phase(page)).not.toBe('waiting')).toPass({ timeout: 5000 })
+  }
+  await settle(page)
+
+  const saved = {
+    body: await body(page).textContent(),
+    bg: await bgLayer(page).getAttribute('data-bg'),
+    sprites: await readSprites(page),
+  }
+  expect(saved.sprites.length).toBeGreaterThan(0)
+
+  await page.getByRole('button', { name: 'セーブ' }).click()
+  await slot(page, 1).click()
+  await expect(page.locator('.wn-overlay')).toHaveCount(0)
+
+  await page.reload()
+  await page.getByRole('button', { name: 'つづきから' }).click()
+  await slot(page, 1).click()
+  await settle(page)
+
+  expect(await body(page).textContent()).toBe(saved.body)
+  expect(await bgLayer(page).getAttribute('data-bg')).toBe(saved.bg)
+  expect(await readSprites(page)).toEqual(saved.sprites)
+
+  // リプレイは現在シーンの入口から走る。セーブ位置はそのシーンの先頭ブロックなので、
+  // バックログはそこまでの1件だけになる（前のシーンの分は遡れない）
+  await page.getByRole('button', { name: '履歴' }).click()
+  await expect(page.locator('.wn-backlog-item')).toHaveCount(1)
+})
+
+test('オートセーブはクリック待ちに到達するたびに打たれる', async ({ page }) => {
+  await startReading(page)
+  await settle(page)
+
+  const auto = await page.evaluate(() => localStorage.getItem('wn:kieta-ippen:save:auto'))
+  expect(auto).not.toBeNull()
+  expect(JSON.parse(auto!)).toMatchObject({ scene: '部室・放課後', index: 0 })
+})
+
+test('台本に存在しないシーンのセーブは、黙って飛ばずに失敗として出る', async ({ page }) => {
+  const dialogs: string[] = []
+  page.on('dialog', (d) => { dialogs.push(d.message()); void d.dismiss() })
+
+  await page.goto('/')
+  await page.evaluate(() => {
+    localStorage.setItem('wn:kieta-ippen:save:2', JSON.stringify({
+      scene: '消えたシーン',
+      index: 0,
+      snapshot: { bg: null, bgm: null, sprites: [], speed: 'normal', flashback: false, vars: {} },
+      savedAt: Date.now(),
+      preview: '…',
+    }))
+  })
+  await page.reload()
+
+  await page.getByRole('button', { name: 'つづきから' }).click()
+  await slot(page, 2).click()
+
+  await expect(async () => expect(dialogs).toHaveLength(1)).toPass({ timeout: 5000 })
+  expect(dialogs[0]).toContain('消えたシーン')
+  // タイトル画面に戻る。別の位置から始まったりしない
+  await expect(page.locator('.wn-title')).toBeVisible()
+})
+
 test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) => {
   await page.goto('/')
   for (const size of [{ width: 900, height: 1400 }, { width: 1600, height: 500 }]) {

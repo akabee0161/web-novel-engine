@@ -75,6 +75,10 @@
 | 21 | Task 14 Step 1 のテストに申し送りの assert がない | 「本文を1つ表示すると `view.backlog` の参照が変わる」を足した | 申し送りが要求しているのは `view.backlog` の参照であって、`Backlog.entries()` の参照ではない。Step 1 の3件目だけではコアの組み込みを検証できない |
 | 22 | Task 14 Step 6 の `Backlog.tsx` がネームプレートの規則を自前で持つ | `ui/speaker.ts` に `displayName()` を切り出し、`MessageBox.tsx` と共用した | 「話者なしの「」は主人公」は script-syntax の規則。2箇所に写すと、片方だけ直したとき同じ行の名前が画面によって変わる |
 | 23 | Task 14 Step 9「実機で確認する」が手動前提 | Playwright に1件足した（演出中はボタンが出ない・シーンをまたいで遡れる・閉じても進行位置が動かない） | 逸脱10 と同じ |
+| 24 | Task 15 Step 1 の `step()` ヘルパが `advance()` のあと「waiting になるまで」待つ | 「本文が変わるまで」待つように変えた | `advance()` は待ちを解くだけで `phase` をその場では変えない。元の書き方だと1度も進まずに通り、6件が空振りで落ちていた |
+| 25 | Task 15 Step 4 の `load()` に、走っている再生ループを止める処理がない | `generation` と `abortRun()` を足し、`runFrom` の各 step 後に世代を確認するようにした | 再生中にロードすると `runFrom` が二重に走り、古いループがクリックのたびに元の位置へ状態を引き戻す。「再生中のロード」のテストを1件足した |
+| 26 | Task 15 Step 8 の「つづきから」が本編へ切り替えてからロードメニューを開く | タイトル画面のままメニューを開き、スロットを選んだ時点で切り替えるようにした | 先に切り替えると、スロットを選ばずに閉じたとき何も表示されていない画面に取り残される。ロードが失敗したときも同じ理由でタイトルに戻す |
+| 27 | Task 15 Step 9「実機で確認する」が手動前提 | Playwright に3件足した（セーブ→リロード→つづきからの再現・オートセーブ・存在しないシーンの明示） | 逸脱10 と同じ。「リプレイ中に SE が連打されない」は時間と発火回数の検証なので core 側に置いた |
 
 **フェーズ3 完了後に確定した仕様**（Task 10 / 11 / 14 に申し送り済み）:
 演出中のクリックは現在の待ちだけ打ち切る（**Task 11 で実装済み**）／
@@ -3835,7 +3839,7 @@ git commit -m "feat: 読み返し専用のバックログを実装する"
 **このタスクが engine-spec の中心。** セーブ互換性に関わるため、
 「実装したら壊れていた」では手遅れになる。テストを厚くする。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 // tests/core/save.test.ts
@@ -4078,12 +4082,12 @@ describe('スロット', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/core/save.test.ts`
 Expected: FAIL（`core/save.ts` が無い）
 
-- [ ] **Step 3: `src/engine/core/save.ts` を書く**
+- [x] **Step 3: `src/engine/core/save.ts` を書く**
 
 ```ts
 import type { Snapshot } from './state.ts'
@@ -4140,7 +4144,7 @@ export function parseSave(raw: string | null): Stored | null {
 }
 ```
 
-- [ ] **Step 4: `Runtime` にセーブとロードを足す**
+- [x] **Step 4: `Runtime` にセーブとロードを足す**
 
 import を足す。
 
@@ -4254,12 +4258,12 @@ import { saveKey } from './storage.ts'
 `if (this.replaying)`、`se` と `bgm` の `if (!this.replaying)`、そしてこの終了判定。
 step の処理そのものには1つも入っていない。
 
-- [ ] **Step 5: テストが通ることを確認する**
+- [x] **Step 5: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/save.test.ts`
 Expected: PASS（12 tests）
 
-- [ ] **Step 6: オートセーブを繋ぐ**
+- [x] **Step 6: オートセーブを繋ぐ**
 
 `RuntimeOptions.onSaveable` は Task 6 で用意してある。`boot.tsx` で接続する。
 
@@ -4277,7 +4281,7 @@ Expected: PASS（12 tests）
 `onSaveable` の中で `runtime` を参照するため、`const runtime` の初期化前に
 評価されないようアロー関数の中で参照する（この書き方なら問題ない）。
 
-- [ ] **Step 7: `src/engine/ui/SaveMenu.tsx` を書く**
+- [x] **Step 7: `src/engine/ui/SaveMenu.tsx` を書く**
 
 ```tsx
 import type { SaveMeta } from '../core/save.ts'
@@ -4354,7 +4358,7 @@ export function SaveMenu({ mode, slots, saves, onPick, onClose }: Props) {
 .wn-slot-time, .wn-slot-empty { opacity: 0.55; font-size: 1.6cqw; }
 ```
 
-- [ ] **Step 8: `App.tsx` と `Title.tsx` にセーブ・ロードの導線を足す**
+- [x] **Step 8: `App.tsx` と `Title.tsx` にセーブ・ロードの導線を足す**
 
 `Runtime` にスロット一覧を公開する。
 
@@ -4424,7 +4428,7 @@ type Props = {
 「つづきから」はロードメニューを開く。`unlockAudio()` はここでも
 **同期的に**呼ぶこと（このクリックがジェスチャの機会）。
 
-- [ ] **Step 9: 実機で確認する**
+- [x] **Step 9: 実機で確認する**
 
 1. 読み進めて「セーブ」→ スロット1に保存
 2. リロード → タイトルの「つづきから」→ スロット1 → セーブ時の画面が出る
@@ -4436,7 +4440,7 @@ type Props = {
 
 確認したらシーン名は元に戻す。
 
-- [ ] **Step 10: コミット**
+- [x] **Step 10: コミット**
 
 ```bash
 git add -A
