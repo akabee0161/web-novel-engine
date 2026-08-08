@@ -16,7 +16,12 @@ export function App({ runtime }: { runtime: Runtime }) {
 
   return (
     <div className="wn-viewport">
-      <div className="wn-stage" onClick={() => started && runtime.advance()}>
+      {/* data-phase は CSS の演出フックであり、E2E が進行を決定的に待つための手掛かりでもある */}
+      <div
+        className="wn-stage"
+        data-phase={state.view.phase}
+        onClick={() => started && runtime.advance()}
+      >
         {started
           ? <MessageBox state={state} script={runtime.script} />
           : <Title title={runtime.script.title} onStart={start} />}
