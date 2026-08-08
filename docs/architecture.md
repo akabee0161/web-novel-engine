@@ -37,12 +37,14 @@ web-novel-engine/
 ├── tools/wn-compile/     ← 台本コンパイラ（Vite プラグイン）
 ├── tests/                ← src / tools をミラーする
 │   ├── compile/
-│   └── core/
+│   ├── core/
+│   └── e2e/              ← Playwright。DOM でしか確認できないもの
 └── novels/
     └── <作品ID>/
         ├── index.html
         ├── main.ts
         ├── script.wn
+        ├── novel.config.json   ← 任意。素材の置き場所を差し替えるときだけ
         └── public/{bg,bgm,se,chara}/
 ```
 
@@ -56,6 +58,8 @@ web-novel-engine/
   "build":     "vite build",
   "build:all": "for d in novels/*/; do NOVEL=$(basename $d) vite build || exit 1; done",
   "test":      "vitest run",
+  "test:e2e":  "playwright test",
+  "gen:assets":"node tools/gen-dummy-assets.mjs novels/kieta-ippen/public",
   "lint":      "eslint .",
   "typecheck": "tsc --noEmit"
 }
@@ -219,6 +223,29 @@ import script from './script.wn'   // 型は CompiledScript
 | 素材の解決 | `public/` をスキャンし、論理名 → 実パスの表を `assets` に出す（下記） |
 | 検証 | 未知の命令、引数の不足・型違い、シーン名の重複をビルドエラーにする |
 
+### 素材の置き場所
+
+既定は `<作品ディレクトリ>/public`。作品ごとに `novel.config.json` を**任意で**置いて差し替えられる。
+
+```json
+{ "assetsDir": "../../../wn-assets/kieta-ippen" }
+```
+
+相対パスは作品ディレクトリ基準、絶対パスも使える。解決は
+`tools/wn-compile/config.ts` の `resolveAssetsDir()` が唯一の担当で、
+`publicDir`（Vite）と `wnCompile()`（コンパイラ）の両方がその結果を受け取る。
+
+**設定ファイルは任意。** 必須にすると「作品を増やすコストはディレクトリ1つ」が崩れる。
+明示した `assetsDir` が存在しなければビルドエラー（設定ミス）。
+既定値 `public` の不在は許す（本文だけの作品が成立するため）。
+
+**実素材はリポジトリに置かない。** git はバイナリの差分を持てないため履歴が単調増加し、
+購入素材は公開リポジトリに置けない。`novels/*/public/` にあるのは動作確認用のダミーだけで、
+`tools/gen-dummy-assets.mjs`（`npm run gen:assets`）で再生成できる。
+
+**素材の秘匿はできない。** 静的サイトなので配信物は必ず取得できる。
+この設定が守るのは「リポジトリに原本を置かない」ことだけであり、難読化・暗号化は設計に含めない。
+
 ### 素材の解決
 
 **パスを step に埋め込まず、論理名 → 実パスの表を1つ出して実行時に引く。**
@@ -292,6 +319,22 @@ engine-spec の不変条件が、そのままテストケースの一覧にな�
 テストは `tests/` にソースをミラーして置く（`tests/compile/parse.test.ts` など）。
 `vite.config.ts` が環境変数 `NOVEL` を要求するため、**config は `vitest.config.ts` に分ける。**
 `NOVEL` を指定しないとテストが走らない状態を避けるため。
+
+### ブラウザでしか確認できないもの
+
+背景・立ち絵・音声・ページ分割は DOM でしか検証できない。
+Playwright を `tests/e2e/` に置く（`npm run test:e2e`）。
+
+| | 走らせるもの | コマンド |
+|---|---|---|
+| `tests/**/*.test.ts` | Vitest。jsdom なし | `npm test` |
+| `tests/e2e/**/*.spec.ts` | Playwright。dev サーバを自動で立てる | `npm run test:e2e` |
+
+**DOM の値を assert するテストだけを置く。スクリーンショット比較は採らない**
+（壊れやすく、維持コストが実利を上回るため）。
+
+進行の状態は `.wn-stage` の `data-phase` 属性に出す。CSS の演出フックであり、
+E2E が文字送りの途中を掴まずに待つための手掛かりでもある。
 
 | テスト | 内容 |
 |---|---|

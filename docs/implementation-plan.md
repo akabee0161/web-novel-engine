@@ -58,7 +58,12 @@
 | 4 | `eslint.config.js` に `.mjs` の globals 指定がない | `**/*.mjs` に Node のグローバルを宣言した | `gen-dummy-assets.mjs` が `no-undef` で落ちる。TS ファイルは typescript-eslint が `no-undef` を切るので影響を受けていなかった |
 | 5 | `boot()` は Task 7 まで存在せず、Task 4 の時点で型エラーになる | Task 4 で `src/engine/index.ts` にスタブ（呼ぶと throw）を置いた | 各コミットで `typecheck` を緑に保つため。中身は Task 7 で入れる |
 | 6 | `sample.test.ts` のテスト名が「7シーンになる」 | 「6シーンになる」に直した | 計画本文の数字と、同じテスト内の期待値配列（6要素）が食い違っていた。台本は6シーン |
-| 7 | Task 7 / 8 の「実機で確認する」が手動前提 | Playwright で自動確認した | 確認項目がすべて DOM から取れる。スクリプトは残していない（scratchpad で実行しただけ） |
+| 7 | Task 7 / 8 の「実機で確認する」が手動前提 | Playwright で自動化し、`tests/e2e/` に残した | 確認項目がすべて DOM から取れる。フェーズ4 の主題（背景・立ち絵・音声）は DOM でしか検証できない |
+| 8 | 素材ディレクトリは `<作品ディレクトリ>/public` に固定 | `novel.config.json` で差し替え可能にした（既定は同じ） | 実素材をリポジトリの外に置けるようにするため。[2026-08-08 の決定](decisions/2026-08-08-asset-location-and-verification.md) |
+| 9 | `.wn-stage` に属性なし | `data-phase` を出すようにした | E2E が文字送りの途中を掴んで不安定になる。CSS の演出フックとしても要る |
+
+**フェーズ3 完了後に確定した仕様**（Task 10 / 11 / 14 に申し送り済み）:
+演出中のクリックは現在の待ちだけ打ち切る／`view` と `snapshot` の配列は置き換える。
 
 **採用したツールのバージョン**（計画が書かれた時点より新しい）:
 Vite 8 / TypeScript 6 / ESLint 10 / Vitest 4 / React 19。
@@ -2484,6 +2489,11 @@ git commit -m "feat: @bg の背景切替とクロスフェードを実装する"
 - Consumes: `Sprite`（`core/state.ts`）、`runtimeOf` / `runToWait`（Task 9 のテストヘルパ）
 - Produces: `snapshot.sprites` が `@show` / `@hide` で更新される
 
+> **申し送り（[2026-08-08 の決定](decisions/2026-08-08-asset-location-and-verification.md) 4）**
+> `sprites` は**配列のまま `push` せず、必ず新しい配列で置き換える。**
+> `emit()` は3層を浅くコピーするだけなので、配列を mutate すると参照が変わらず React が再描画しない。
+> **`@show` の前後で `snapshot.sprites` の参照が変わることを assert するテストを1つ足すこと。**
+
 - [ ] **Step 1: 失敗するテストを書く**
 
 ```ts
@@ -2656,6 +2666,13 @@ git commit -m "feat: @show / @hide の立ち絵表示を実装する"
 **Interfaces:**
 - Consumes: `Runtime.perform()`、`charDelayMs()`（Task 8）
 - Produces: `snapshot.speed` / `snapshot.flashback` が更新され、`@wait` が待ちを消費する
+- Produces: `advance()` が `phase === 'performing'` のとき、進行中の待ちを打ち切る
+
+> **申し送り（[2026-08-08 の決定](decisions/2026-08-08-asset-location-and-verification.md) 2）**
+> engine-spec に**演出中のクリック**の規定が入った。**現在の待ちだけを打ち切る**（連打で連続スキップ）。
+> `perform()` の `sleep` を中断可能にし、`advance()` の `phase === 'typing'` 分岐の隣に
+> `performing` の分岐を足す。次の本文ブロックには進めないこと。
+> テストは「`@wait 5000` の最中に `advance()` すると即座に次へ進む」で固定する。
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -3532,6 +3549,11 @@ git commit -m "feat: 差し替え可能なストレージと既読の記録を�
   - `BACKLOG_LIMIT = 200`
   - `class Backlog { push(e); entries(); clear() }`
   - `runtime.canOpenUi(): boolean`（クリック待ちの瞬間だけ true）
+
+> **申し送り（[2026-08-08 の決定](decisions/2026-08-08-asset-location-and-verification.md) 4）**
+> `view.backlog` は**配列のまま `push` せず、必ず新しい配列で置き換える。**
+> `emit()` は3層を浅くコピーするだけなので、配列を mutate すると参照が変わらず React が再描画しない。
+> **本文を1つ表示したあと `view.backlog` の参照が変わることを assert するテストを1つ足すこと。**
 
 **バックログはスナップショットに入らない**（不変条件4の唯一の例外）。
 画面の見た目を決めないため、含めなくても復元後の画面は完全に一致する。
