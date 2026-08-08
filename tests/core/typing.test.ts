@@ -42,10 +42,16 @@ describe('文字送りの速度', () => {
 describe('文字送りの進行', () => {
   it('逐次表示では visibleChars が 0 から増えていく', async () => {
     const r = make({ ...DEFAULT_SETTINGS, textSpeed: 'fast' })
+    // 「文字送りが始まった瞬間」はポーリングでは捕まらない。全部の emit を拾う
+    const seen: number[] = []
+    const unsubscribe = r.subscribe(() => seen.push(r.getState().view.visibleChars))
+
     void r.start()
-    await vi.waitFor(() => expect(r.getState().view.phase).toBe('typing'))
-    expect(r.getState().view.visibleChars).toBe(0)
     await vi.waitFor(() => expect(r.getState().view.phase).toBe('waiting'), { timeout: 2000 })
+    unsubscribe()
+
+    expect(seen[0]).toBe(0)
+    expect(seen).toEqual(expect.arrayContaining([0, 1, 2, 3, 4, 5]))
     expect(r.getState().view.visibleChars).toBe(5)
   })
 

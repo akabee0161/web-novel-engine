@@ -56,6 +56,9 @@ export class Runtime {
    */
   private generation = 0
   private readonly slots = ['auto', '1', '2', '3'] as const
+  /** UI が接続されている場合だけページ分割を行う。テストとリプレイでは1ページ扱い */
+  private paginate = false
+  private pageBreaksResolve: ((breaks: number[]) => void) | null = null
   /** シーン入口のスナップショット。セーブはこれを書き出す */
   protected sceneEntry: Snapshot
   protected sceneIdx = 0
@@ -115,6 +118,36 @@ export class Runtime {
 
   canSave(): boolean {
     return this.state.view.phase === 'waiting'
+  }
+
+  /** テキストを測れる UI が繋がったときに呼ぶ。呼ばれるまでは常に1ページ */
+  enablePagination(): void {
+    this.paginate = true
+  }
+
+  /** UI 側が測定待ちを検知するため（テストでも使う） */
+  isWaitingForPageBreaks(): boolean {
+    return this.pageBreaksResolve !== null
+  }
+
+  /**
+   * UI が測った「各ページの先頭文字位置」を渡す。`[0]` は常に補われる。
+   * 意味を持つのは `isWaitingForPageBreaks()` が true のあいだだけで、
+   * それ以外のときは無視する（本文の途中で区切りが変わると表示が破綻するため）。
+   */
+  setPageBreaks(breaks: number[]): void {
+    const resolve = this.pageBreaksResolve
+    if (!resolve) return
+    this.pageBreaksResolve = null
+    const normalized = breaks[0] === 0 ? breaks : [0, ...breaks]
+    this.state.view.pageBreaks = normalized
+    this.emit()
+    resolve(normalized)
+  }
+
+  private waitForPageBreaks(): Promise<number[]> {
+    if (!this.paginate || this.replaying) return Promise.resolve([0])
+    return new Promise<number[]>((resolve) => { this.pageBreaksResolve = resolve })
   }
 
   get saveSlots(): readonly string[] {
@@ -357,6 +390,8 @@ export class Runtime {
   }
 
   private async execText(step: Extract<Step, { t: 'text' }>): Promise<void> {
+    const gen = this.generation
+
     // セーブ操作とは無関係に、本文を表示した瞬間に記録する
     this.read.add(step.h)
     // バックログはシーン境界でクリアしない（enterScene に手を入れないこと）。
@@ -366,36 +401,51 @@ export class Runtime {
     this.state.progress.index = step.i
     this.state.view.currentText = { speaker: step.speaker, body: step.body }
     this.state.view.visibleChars = 0
+    this.state.view.pageBreaks = [0]
+    this.state.view.page = { current: 0, total: 1 }
+    this.state.view.phase = 'performing'
     this.emit()
-    await this.type(step.body)
-    await this.waitForClick()
+
+    // UI がこの本文を測り終えるまで待つ。ページ分割が無効なら即座に [0] が返る
+    const breaks = await this.waitForPageBreaks()
+
+    for (let p = 0; p < breaks.length; p++) {
+      // ロードで打ち切られていたら、ページを1つも進めずに降りる
+      if (gen !== this.generation) return
+      const end = p + 1 < breaks.length ? breaks[p + 1] : step.body.length
+      this.state.view.page = { current: p, total: breaks.length }
+      this.emit()
+      await this.type(step.body, breaks[p], end)
+      // ページ送り待ちもセーブ可能点。画面が静止して次のクリックを待つ点は最終ページと同じ
+      await this.waitForClick()
+    }
   }
 
   /**
-   * 1文字ずつ visibleChars を進める。
+   * ページの範囲 [from, to) を1文字ずつ visibleChars で開く。
    * リプレイ中と一括表示のときは即座に全文表示になる。
    */
-  private async type(body: string): Promise<void> {
+  private async type(body: string, from: number, to: number): Promise<void> {
     const delay = charDelayMs(this.settings, this.state.snapshot.speed)
     if (this.replaying || delay === 0) {
-      this.state.view.visibleChars = body.length
+      this.state.view.visibleChars = to
       this.emit()
       return
     }
 
     this.state.view.phase = 'typing'
-    this.state.view.visibleChars = 0
+    this.state.view.visibleChars = from
     this.skipTyping = false
     this.emit()
 
-    for (let n = 1; n <= body.length; n++) {
+    for (let n = from + 1; n <= to; n++) {
       await sleep(delay)
       if (this.skipTyping) break
       this.state.view.visibleChars = n
       this.emit()
     }
 
-    this.state.view.visibleChars = body.length
+    this.state.view.visibleChars = to
     this.emit()
   }
 

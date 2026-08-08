@@ -39,6 +39,10 @@ export function boot(opts: BootOptions): void {
     },
   })
 
+  // 本文を測れる UI が繋がるので、ここでページ分割を有効にする。
+  // MessageBox の効果で有効化すると、最初の1ブロックだけ測定前に流れてしまう
+  runtime.enablePagination()
+
   // 既読は本文1ブロックごとに増える。1ブロックごとに localStorage を触ると
   // 文字送りと同じ頻度で同期 I/O が走るため、まとめて書き出す
   const timer = setInterval(() => runtime.flushSystem(), 5000)

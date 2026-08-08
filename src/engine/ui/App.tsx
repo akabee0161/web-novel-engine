@@ -69,7 +69,7 @@ export function App({ runtime }: { runtime: Runtime }) {
         {started ? (
           <>
             <Stage runtime={runtime} state={state} />
-            <MessageBox state={state} script={runtime.script} />
+            <MessageBox runtime={runtime} state={state} />
             {/* 演出中・文字送り中は導線ごと出さない。開ける条件はセーブ可能点と同じ */}
             {ui === 'none' && runtime.canOpenUi() && (
               <div className="wn-corner" onClick={(e) => e.stopPropagation()}>

@@ -17,7 +17,8 @@ const LAST_BODY = '「読んでくれた?」'
 const TOTAL_BLOCKS = 63
 
 const stage = (page: Page) => page.locator('.wn-stage')
-const body = (page: Page) => page.locator('.wn-messagebox > div:last-child')
+/** 表示中の本文。測定用の .wn-measure を掴まないよう、クラスで直接指す */
+const body = (page: Page) => page.locator('.wn-body')
 const speaker = (page: Page) => page.locator('.wn-speaker')
 /** 手前に出ている背景レイヤ。data-bg に @bg の引数が入る */
 const bgLayer = (page: Page) => page.locator('.wn-bg-in')
@@ -452,6 +453,35 @@ test('一括表示にすると @speed の区間でも文字が流れず、設定
   await page.reload()
   await page.getByRole('button', { name: '設定' }).click()
   await expect(page.getByRole('button', { name: '一括表示' })).toHaveClass(/is-on/)
+})
+
+test('枠に収まらない本文はページに分かれ、文字を落とさずに送られる', async ({ page }) => {
+  await page.goto('/')
+  // 台本を書き換えずにページ送りを踏むため、文字を大きくして枠に収まらなくする。
+  // .wn-body と .wn-measure の両方が .wn-messagebox の font-size を継承する
+  await page.addStyleTag({ content: '.wn-messagebox { font-size: 5cqw !important; }' })
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+
+  const indicator = page.locator('.wn-page')
+  const pages: string[] = []
+  for (;;) {
+    await settle(page)
+    pages.push((await body(page).textContent()) ?? '')
+    const [current, total] = (await indicator.textContent())!.split('/').map((s) => Number(s))
+    if (current === total) break
+    await tap(page)
+    await expect(indicator).toHaveText(`${current + 1} / ${total}`)
+  }
+
+  expect(pages.length).toBeGreaterThan(1)
+  // ページの継ぎ目で文字が落ちても重複してもいけない
+  expect(pages.join('')).toBe(FIRST_BODY)
+
+  // 最終ページのクリックで次の本文に進む
+  await tap(page)
+  await settle(page)
+  expect(await body(page).textContent()).not.toBe(pages.at(-1))
 })
 
 test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) => {

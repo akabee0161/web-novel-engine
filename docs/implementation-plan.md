@@ -81,6 +81,13 @@
 | 27 | Task 15 Step 9「実機で確認する」が手動前提 | Playwright に3件足した（セーブ→リロード→つづきからの再現・オートセーブ・存在しないシーンの明示） | 逸脱10 と同じ。「リプレイ中に SE が連打されない」は時間と発火回数の検証なので core 側に置いた |
 | 28 | Task 16 Step 4「実機で確認する」が手動前提 | Playwright に1件足した（一括表示で `@speed` の区間でも `typing` が1度も出ない・速さの選択が無効になる・リロードをまたぐ） | 逸脱10 と同じ。音量が BGM に届いているかは DOM から取れないので入れていない |
 | 29 | — | **一括表示のあいだ `data-phase` は `waiting` のまま変わらない**（文字送りの区間が無く、`type()` が phase を触らずに返るため）。E2E の待ち合わせは本文の変化で行う | 逐次表示を前提にした `phase` の遷移待ちが、一括表示では即座に成立して空振りする。既存の E2E ヘルパ `settle` / `readAll` も逐次表示専用 |
+| 30 | Task 17 Step 5 の `computePageBreaks` が Range の矩形高さと要素の `clientHeight` を比べる | 行数で比べるようにした（`range.getClientRects().length <= floor(maxHeight / line-height)`） | Range の矩形は**グリフの範囲であって行送りを含まない**。最終行の行送りぶんだけ判定が甘くなり、枠から1行はみ出す。実測で 2行=224px が「192px に収まる」と判定されていた |
+| 31 | Task 17 Step 6 の測定効果が `text?.body` をキーにする | 依存配列を置かず、毎レンダで `isWaitingForPageBreaks()` を見るようにした | 同じ本文が2回続いたときや、同じブロックへロードし直したときに効果が再実行されず、コアが測定待ちのまま**永久に止まる** |
+| 32 | Task 17 Step 6 の `enablePagination()` が `MessageBox` の効果の中 | `boot.tsx` に移した | 効果は初回レンダの**後**に走るので、最初の1ブロックだけ測定前に1ページ扱いで流れてしまう |
+| 33 | Task 17 Step 6 の resize での再測定 | 入れていない。`setPageBreaks` は測定待ちのときだけ効く | 本文の途中で区切りが変わると、`type()` が走り終えた範囲と表示範囲が食い違って表示が壊れる。画面サイズの変更は**次の本文ブロックから**反映される |
+| 34 | Task 17 Step 8「実機で確認する」が台本に長い行を一時的に足す前提 | Playwright で `.wn-messagebox` の `font-size` を上書きし、既存の本文を溢れさせた。ページの連結が元の本文と一致することまで見る | 台本は作品そのものなので、確認のために書き換えたくない。逸脱10 と同じく E2E に残す |
+| 35 | Task 17 Step 1 の `advance()` 後の待ち合わせ | ページ番号が変わるまで待つ `nextPage()` にした | 逸脱24 と同じ理由。既存の `typing.test.ts` も測定待ちの await が1つ増えたことで不安定になったため、購読で全 emit を拾う形に書き換えた |
+| 36 | — | E2E の本文ロケータ `.wn-messagebox > div:last-child` を `.wn-body` に変えた | 測定用の `.wn-measure` が最後の子になり、**常に全文**を持つため掴む対象が入れ替わっていた |
 
 **フェーズ3 完了後に確定した仕様**（Task 10 / 11 / 14 に申し送り済み）:
 演出中のクリックは現在の待ちだけ打ち切る（**Task 11 で実装済み**）／
@@ -4604,7 +4611,7 @@ git commit -m "feat: 文字送りと音量の設定画面を追加する"
 
 **測定は UI の責務。** コアは DOM を触れないので、文字数の境界を数値で受け取る。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [x] **Step 1: 失敗するテストを書く**
 
 ```ts
 // tests/core/paging.test.ts
@@ -4690,12 +4697,12 @@ describe('ページ送り', () => {
 })
 ```
 
-- [ ] **Step 2: 実行して落ちることを確認する**
+- [x] **Step 2: 実行して落ちることを確認する**
 
 Run: `npx vitest run tests/core/paging.test.ts`
 Expected: FAIL（`enablePagination` が無い）
 
-- [ ] **Step 3: `Runtime` にページ送りを足す**
+- [x] **Step 3: `Runtime` にページ送りを足す**
 
 フィールドを足す。
 
@@ -4794,12 +4801,12 @@ Expected: FAIL（`enablePagination` が無い）
 MessageBox は `body.slice(pageStart, visibleChars)` を描くことになるが、
 **前のページの文字を残さない**ため、表示は `slice(pageBreaks[current], visibleChars)` にする。
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `npx vitest run tests/core/`
 Expected: PASS（既存テストも含め全部）
 
-- [ ] **Step 5: `src/engine/ui/paginate.ts` を書く**
+- [x] **Step 5: `src/engine/ui/paginate.ts` を書く**
 
 ```ts
 /**
@@ -4841,7 +4848,7 @@ export function computePageBreaks(host: HTMLElement, text: string, maxHeight: nu
 }
 ```
 
-- [ ] **Step 6: `MessageBox.tsx` に測定を組み込む**
+- [x] **Step 6: `MessageBox.tsx` に測定を組み込む**
 
 ```tsx
 import { useEffect, useLayoutEffect, useRef } from 'react'
@@ -4907,7 +4914,7 @@ export function MessageBox({ runtime, state }: Props) {
 `App.tsx` の `<MessageBox state={state} script={runtime.script} />` を
 `<MessageBox runtime={runtime} state={state} />` に直す。
 
-- [ ] **Step 7: `style.css` に測定要素のスタイルを足す**
+- [x] **Step 7: `style.css` に測定要素のスタイルを足す**
 
 ```css
 .wn-messagebox { position: absolute; /* 既存のまま */ }
@@ -4927,7 +4934,7 @@ export function MessageBox({ runtime, state }: Props) {
 `.wn-messagebox` の `font-size` / `line-height` を継承し、左右の余白を揃えている。
 片方だけ変えると測定がずれる。
 
-- [ ] **Step 8: 実機で確認する**
+- [x] **Step 8: 実機で確認する**
 
 台本に長い1行を一時的に足して確かめる。
 
@@ -4944,7 +4951,7 @@ export function MessageBox({ runtime, state }: Props) {
 
 確認したら足した行を消す。
 
-- [ ] **Step 9: コミット**
+- [x] **Step 9: コミット**
 
 ```bash
 git add -A

@@ -102,6 +102,19 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
   font-size: 2.6cqw;
   line-height: 1.75;
 }
+/* .wn-body と .wn-measure は同じ幅・フォントサイズ・行間でなければならない。
+   片方だけ変えるとページの測定がずれる */
+.wn-body { height: 15cqw; overflow: hidden; white-space: pre-wrap; }
+.wn-measure {
+  position: absolute;
+  left: 3cqw; right: 3cqw;
+  top: 3cqw;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+.wn-page { position: absolute; right: 2cqw; bottom: 1cqw; font-size: 1.6cqw; opacity: 0.6; }
+
 .wn-speaker {
   position: absolute;
   top: -3.4cqw; left: 2cqw;
