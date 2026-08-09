@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 declare global {
   interface Window {
@@ -515,4 +515,37 @@ test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) 
     expect(box).not.toBeNull()
     expect(box!.width / box!.height).toBeCloseTo(16 / 9, 2)
   }
+})
+
+/** 計算後のスタイルを数値で取る。'33.28px' → 33.28 */
+const cssPx = (loc: Locator, prop: string) =>
+  loc.evaluate((el, p) => parseFloat(getComputedStyle(el).getPropertyValue(p)), prop)
+
+/**
+ * 寸法は基準解像度に対する比で決まる。1280 幅なら本文は 2.6% = 33.28px。
+ * 倍率変数（--wn-u）を入れても横持ちの見た目が変わらないことを、この数字で押さえる。
+ */
+test('横持ちの寸法はステージ幅に対する比で決まる', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  // .wn-speaker は本文ブロックに話者がいないと出ない。FIRST_BODY は地の文なので、
+  // 話者（トオル）がいる屋上前シーンの3ブロック目から始める
+  await page.goto('/?scene=' + encodeURIComponent('屋上前') + '&index=2')
+
+  expect(await cssPx(page.locator('.wn-title h1'), 'font-size')).toBeCloseTo(76.8, 1)
+  expect(await cssPx(page.locator('.wn-title .wn-button').first(), 'font-size')).toBeCloseTo(30.72, 1)
+
+  await page.getByRole('button', { name: '設定' }).click()
+  expect(await cssPx(page.locator('.wn-panel'), 'width')).toBeCloseTo(1024, 0)
+  expect(await cssPx(page.locator('.wn-panel'), 'font-size')).toBeCloseTo(28.16, 1)
+  await page.getByRole('button', { name: '閉じる' }).click()
+
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+  expect(await cssPx(page.locator('.wn-messagebox'), 'font-size')).toBeCloseTo(33.28, 1)
+  expect(await cssPx(page.locator('.wn-body'), 'height')).toBeCloseTo(192, 0)
+  expect(await cssPx(page.locator('.wn-speaker'), 'font-size')).toBeCloseTo(28.16, 1)
+
+  // .wn-body と .wn-measure は同じ幅でなければならない（片方だけ直すとページ測定がずれる）
+  const bodyWidth = await cssPx(page.locator('.wn-body'), 'width')
+  expect(await cssPx(page.locator('.wn-measure'), 'width')).toBeCloseTo(bodyWidth, 1)
 })

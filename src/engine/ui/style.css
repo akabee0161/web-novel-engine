@@ -17,6 +17,10 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
   position: relative;
   width: min(100vw, calc(100dvh * 16 / 9));
   height: min(100dvh, calc(100vw * 9 / 16));
+  /* 内部の寸法はすべてこの倍率の係数で書く。横持ちは 1cqw = ステージ幅の 1%。
+     縦持ちだけメディアクエリで倍率を差し替えるので、係数は1箇所も書き換えなくてよい。
+     場面（.wn-scene）の内側では使わないこと。コンテナが変わり基準がずれる */
+  --wn-u: 1cqw;
   container-type: size;
   overflow: hidden;
   user-select: none;
@@ -75,58 +79,71 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4cqw;
+  gap: calc(4 * var(--wn-u));
   background: #12141c;
 }
-.wn-title h1 { margin: 0; font-size: 6cqw; font-weight: 600; letter-spacing: 0.1em; }
-.wn-title-buttons { display: flex; gap: 2cqw; }
+.wn-title h1 { margin: 0; font-size: calc(6 * var(--wn-u)); font-weight: 600; letter-spacing: 0.1em; }
+.wn-title-buttons { display: flex; gap: calc(2 * var(--wn-u)); }
 .wn-button {
-  padding: 1.4cqw 4cqw;
+  padding: calc(1.4 * var(--wn-u)) calc(4 * var(--wn-u));
   font: inherit;
-  font-size: 2.4cqw;
+  font-size: calc(2.4 * var(--wn-u));
   color: #f2f2f2;
   background: rgba(255, 255, 255, 0.08);
-  border: 0.15cqw solid rgba(255, 255, 255, 0.35);
-  border-radius: 0.8cqw;
+  border: calc(0.15 * var(--wn-u)) solid rgba(255, 255, 255, 0.35);
+  border-radius: calc(0.8 * var(--wn-u));
   cursor: pointer;
 }
 .wn-button:disabled { opacity: 0.35; cursor: default; }
 
 .wn-messagebox {
   position: absolute;
-  left: 5cqw; right: 5cqw; bottom: 4cqw;
-  min-height: 21cqw;
-  padding: 3cqw;
+  left: calc(5 * var(--wn-u)); right: calc(5 * var(--wn-u)); bottom: calc(4 * var(--wn-u));
+  min-height: calc(21 * var(--wn-u));
+  padding: calc(3 * var(--wn-u));
   background: rgba(8, 10, 16, 0.78);
-  border-radius: 1cqw;
-  font-size: 2.6cqw;
+  border-radius: calc(1 * var(--wn-u));
+  font-size: calc(2.6 * var(--wn-u));
   line-height: 1.75;
 }
 /* .wn-body と .wn-measure は同じ幅・フォントサイズ・行間でなければならない。
-   片方だけ変えるとページの測定がずれる */
-.wn-body { height: 15cqw; overflow: hidden; white-space: pre-wrap; }
+   片方だけ変えるとページの測定がずれる。幅は両方とも padding と同じ式を使うこと */
+.wn-body { height: calc(15 * var(--wn-u)); overflow: hidden; white-space: pre-wrap; }
 .wn-measure {
   position: absolute;
-  left: 3cqw; right: 3cqw;
-  top: 3cqw;
+  left: calc(3 * var(--wn-u)); right: calc(3 * var(--wn-u));
+  top: calc(3 * var(--wn-u));
   visibility: hidden;
   pointer-events: none;
   white-space: pre-wrap;
 }
-.wn-page { position: absolute; right: 2cqw; bottom: 1cqw; font-size: 1.6cqw; opacity: 0.6; }
+.wn-page {
+  position: absolute;
+  right: calc(2 * var(--wn-u)); bottom: calc(1 * var(--wn-u));
+  font-size: calc(1.6 * var(--wn-u));
+  opacity: 0.6;
+}
 
 .wn-speaker {
   position: absolute;
-  top: -3.4cqw; left: 2cqw;
-  padding: 0.5cqw 2cqw;
-  font-size: 2.2cqw;
+  top: calc(-3.4 * var(--wn-u)); left: calc(2 * var(--wn-u));
+  padding: calc(0.5 * var(--wn-u)) calc(2 * var(--wn-u));
+  font-size: calc(2.2 * var(--wn-u));
   background: rgba(8, 10, 16, 0.92);
-  border-radius: 0.7cqw;
+  border-radius: calc(0.7 * var(--wn-u));
 }
 
 /* クリック待ちのときだけ出る操作ボタン群 */
-.wn-corner { position: absolute; top: 2cqw; right: 2cqw; display: flex; gap: 1cqw; }
-.wn-corner .wn-button { font-size: 1.8cqw; padding: 0.8cqw 2cqw; }
+.wn-corner {
+  position: absolute;
+  top: calc(2 * var(--wn-u)); right: calc(2 * var(--wn-u));
+  display: flex;
+  gap: calc(1 * var(--wn-u));
+}
+.wn-corner .wn-button {
+  font-size: calc(1.8 * var(--wn-u));
+  padding: calc(0.8 * var(--wn-u)) calc(2 * var(--wn-u));
+}
 
 .wn-overlay {
   position: absolute;
@@ -141,52 +158,52 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
   max-height: 82cqh;
   display: flex;
   flex-direction: column;
-  gap: 2cqw;
-  padding: 3cqw;
+  gap: calc(2 * var(--wn-u));
+  padding: calc(3 * var(--wn-u));
   background: #141821;
-  border-radius: 1cqw;
-  font-size: 2.2cqw;
+  border-radius: calc(1 * var(--wn-u));
+  font-size: calc(2.2 * var(--wn-u));
 }
 .wn-panel-head { display: flex; justify-content: space-between; align-items: center; }
 .wn-backlog-list { overflow-y: auto; line-height: 1.8; }
-.wn-backlog-item { margin: 0 0 1.4cqw; }
-.wn-backlog-name { display: inline-block; margin-right: 1cqw; opacity: 0.7; }
+.wn-backlog-item { margin: 0 0 calc(1.4 * var(--wn-u)); }
+.wn-backlog-name { display: inline-block; margin-right: calc(1 * var(--wn-u)); opacity: 0.7; }
 
-.wn-slots { display: flex; flex-direction: column; gap: 1.2cqw; overflow-y: auto; }
+.wn-slots { display: flex; flex-direction: column; gap: calc(1.2 * var(--wn-u)); overflow-y: auto; }
 .wn-slot {
   display: grid;
   grid-template-columns: 12cqw 16cqw 1fr auto;
-  gap: 1.5cqw;
+  gap: calc(1.5 * var(--wn-u));
   align-items: baseline;
-  padding: 1.4cqw 2cqw;
+  padding: calc(1.4 * var(--wn-u)) calc(2 * var(--wn-u));
   font: inherit;
-  font-size: 1.9cqw;
+  font-size: calc(1.9 * var(--wn-u));
   text-align: left;
   color: #f2f2f2;
   background: rgba(255, 255, 255, 0.06);
-  border: 0.12cqw solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.6cqw;
+  border: calc(0.12 * var(--wn-u)) solid rgba(255, 255, 255, 0.2);
+  border-radius: calc(0.6 * var(--wn-u));
   cursor: pointer;
 }
 .wn-slot:disabled { opacity: 0.35; cursor: default; }
 .wn-slot-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85; }
-.wn-slot-time, .wn-slot-empty { opacity: 0.55; font-size: 1.6cqw; }
+.wn-slot-time, .wn-slot-empty { opacity: 0.55; font-size: calc(1.6 * var(--wn-u)); }
 
 .wn-setting-row {
   display: grid;
-  grid-template-columns: 18cqw 1fr;
-  gap: 2cqw;
+  grid-template-columns: calc(18 * var(--wn-u)) 1fr;
+  gap: calc(2 * var(--wn-u));
   align-items: center;
 }
-.wn-choices { display: flex; gap: 1cqw; }
+.wn-choices { display: flex; gap: calc(1 * var(--wn-u)); }
 .wn-choice {
-  padding: 0.8cqw 2cqw;
+  padding: calc(0.8 * var(--wn-u)) calc(2 * var(--wn-u));
   font: inherit;
-  font-size: 1.9cqw;
+  font-size: calc(1.9 * var(--wn-u));
   color: #f2f2f2;
   background: rgba(255, 255, 255, 0.06);
-  border: 0.12cqw solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.6cqw;
+  border: calc(0.12 * var(--wn-u)) solid rgba(255, 255, 255, 0.2);
+  border-radius: calc(0.6 * var(--wn-u));
   cursor: pointer;
 }
 .wn-choice.is-on { background: rgba(255, 255, 255, 0.28); }
