@@ -30,7 +30,21 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
   cursor: pointer;
 }
 
-.wn-scene { position: absolute; inset: 0; transition: filter 600ms linear; }
+/* 「場面」＝背景と立ち絵の領域。ここをコンテナにすることで、立ち絵の 88cqh が
+   ステージではなく場面を基準に解決される。横持ちでは場面とステージが同寸なので
+   結果は変わらないが、縦持ちで場面が上半分になったときに効いてくる。
+   場面の内側で --wn-u を使ってはいけない（基準が場面になり倍率がずれる） */
+.wn-scene {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  transition: filter 600ms linear;
+}
+
+/* 本文枠のラッパ。横持ちではステージ全面に敷くだけで、枠の位置は .wn-messagebox が持つ。
+   縦持ちでは場面の下の残り全部を占める箱になる。
+   透過部分のクリックが下に抜けるよう pointer-events を切る */
+.wn-msg-area { position: absolute; inset: 0; pointer-events: none; }
 
 /* 600ms は runtime.ts の FLASHBACK_FADE_MS と同じ値。
    片方だけ変えると演出とコアの待ち時間がずれるので、変えるときは両方直す */
@@ -98,6 +112,7 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
 
 .wn-messagebox {
   position: absolute;
+  pointer-events: auto;
   left: calc(5 * var(--wn-u)); right: calc(5 * var(--wn-u)); bottom: calc(4 * var(--wn-u));
   min-height: calc(21 * var(--wn-u));
   padding: calc(3 * var(--wn-u));

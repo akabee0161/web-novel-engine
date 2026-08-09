@@ -549,3 +549,18 @@ test('横持ちの寸法はステージ幅に対する比で決まる', async ({
   const bodyWidth = await cssPx(page.locator('.wn-body'), 'width')
   expect(await cssPx(page.locator('.wn-measure'), 'width')).toBeCloseTo(bodyWidth, 1)
 })
+
+/**
+ * 立ち絵の高さは「場面」の 88%。横持ちでは場面＝ステージなので現状と同じ値になるが、
+ * 縦持ちで場面が上半分になったときに巨大化しないための基準はここにある。
+ */
+test('立ち絵の高さは場面の 88%', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.goto('/?scene=' + encodeURIComponent('屋上前') + '&index=2')
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-sprite')
+
+  const scene = (await page.locator('.wn-scene').boundingBox())!
+  const sprite = (await page.locator('.wn-sprite').first().boundingBox())!
+  expect(sprite.height).toBeCloseTo(scene.height * 0.88, 0)
+})
