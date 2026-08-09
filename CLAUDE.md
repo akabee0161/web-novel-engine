@@ -13,7 +13,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 何をするエンジンか（セーブ・既読・音声の仕様） | `docs/engine-spec.md` |
 | どう作るか（構成・境界・テスト） | `docs/architecture.md` |
 | 台本の書き方 | `docs/script-syntax.md` |
-| 次に何を実装するか | `docs/implementation-plan.md` |
+| 次に何をするか | `docs/status.md` の「残事項」（初期実装の18タスクは完了済み） |
+| 初期実装をどう作ったか | `docs/implementation-plan.md`（18タスクと逸脱の記録） |
 | なぜそう決めたか | `docs/decisions/` |
 
 ## 譲れない原則
