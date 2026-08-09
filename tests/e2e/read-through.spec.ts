@@ -34,8 +34,12 @@ const readSprites = (page: Page) =>
 
 const phase = (page: Page) => stage(page).getAttribute('data-phase')
 
-/** ステージのどこでもよいが、メッセージ枠を避けて上部を押す */
-const tap = (page: Page) => stage(page).click({ position: { x: 640, y: 120 } })
+/** ステージのどこでもよいが、メッセージ枠を避けて上部を押す。
+    縦持ちでも枠の外に当たるよう、絶対座標ではなくステージ幅に対する比で指す */
+const tap = async (page: Page) => {
+  const box = (await stage(page).boundingBox())!
+  await stage(page).click({ position: { x: box.width * 0.5, y: box.height * 0.15 } })
+}
 
 async function startReading(page: Page) {
   await page.goto('/')
@@ -507,14 +511,19 @@ test('存在しないシーンを指定したら、黙って先頭から始め�
   await expect(page.locator('.wn-title')).toBeVisible()
 })
 
-test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) => {
+test('横持ちはステージが 16:9、縦持ちはビューポート全体を使う', async ({ page }) => {
   await page.goto('/')
-  for (const size of [{ width: 900, height: 1400 }, { width: 1600, height: 500 }]) {
-    await page.setViewportSize(size)
-    const box = await stage(page).boundingBox()
-    expect(box).not.toBeNull()
-    expect(box!.width / box!.height).toBeCloseTo(16 / 9, 2)
-  }
+
+  // 横長: ステージが 16:9 でレターボックスされる
+  await page.setViewportSize({ width: 1600, height: 500 })
+  const wide = (await stage(page).boundingBox())!
+  expect(wide.width / wide.height).toBeCloseTo(16 / 9, 2)
+
+  // 縦長: レターボックスをやめ、ビューポート全体をステージにする
+  await page.setViewportSize({ width: 900, height: 1400 })
+  const tall = (await stage(page).boundingBox())!
+  expect(tall.width).toBeCloseTo(900, 0)
+  expect(tall.height).toBeCloseTo(1400, 0)
 })
 
 /** 計算後のスタイルを数値で取る。'33.28px' → 33.28 */
@@ -563,4 +572,47 @@ test('立ち絵の高さは場面の 88%', async ({ page }) => {
   const scene = (await page.locator('.wn-scene').boundingBox())!
   const sprite = (await page.locator('.wn-sprite').first().boundingBox())!
   expect(sprite.height).toBeCloseTo(scene.height * 0.88, 0)
+})
+
+/** iPhone 14 相当。設計ドキュメントの表と同じ数字を検証する */
+test('縦持ちは上下 50:50 に分割され、下は全部が本文枠になる', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+
+  const st = (await stage(page).boundingBox())!
+  expect(st.width).toBeCloseTo(390, 0)
+  expect(st.height).toBeCloseTo(844, 0)
+
+  // 場面は画面高の 50%。16:9 ではない（背景は cover で左右が切れる）
+  const scene = (await page.locator('.wn-scene').boundingBox())!
+  expect(scene.width).toBeCloseTo(390, 0)
+  expect(scene.height).toBeCloseTo(422, 0)
+
+  // 場面の下は黒を残さず、全部を本文枠の領域が使う
+  const area = (await page.locator('.wn-msg-area').boundingBox())!
+  expect(area.y).toBeCloseTo(scene.y + scene.height, 0)
+  expect(area.height).toBeCloseTo(844 - 422, 0)
+
+  // 文字は横持ち相当まで拡大される（係数 2.6 × 倍率 1.7）
+  expect(await cssPx(page.locator('.wn-messagebox'), 'font-size')).toBeCloseTo(390 * 0.026 * 1.7, 1)
+  // 測定用の要素は本文と同じ幅でなければならない
+  const bodyWidth = await cssPx(page.locator('.wn-body'), 'width')
+  expect(await cssPx(page.locator('.wn-measure'), 'width')).toBeCloseTo(bodyWidth, 1)
+  // 本文は枠の残り全部を使う（横持ちの固定高ではない）
+  expect(await cssPx(page.locator('.wn-body'), 'height')).toBeGreaterThan(200)
+})
+
+test('縦持ちでも立ち絵は場面の 88% に収まる', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/?scene=' + encodeURIComponent('屋上前') + '&index=2')
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-sprite')
+
+  const scene = (await page.locator('.wn-scene').boundingBox())!
+  const sprite = (await page.locator('.wn-sprite').first().boundingBox())!
+  expect(sprite.height).toBeCloseTo(scene.height * 0.88, 0)
+  // 場面からはみ出さない
+  expect(sprite.height).toBeLessThan(scene.height)
 })

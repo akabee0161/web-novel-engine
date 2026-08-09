@@ -223,3 +223,53 @@ html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
 }
 .wn-choice.is-on { background: rgba(255, 255, 255, 0.28); }
 .wn-choice:disabled { opacity: 0.35; cursor: default; }
+
+/* 縦持ちは上下分割にする。ステージをビューポート全体に広げ、上半分を場面、
+   残り全部を本文枠が使う。背景は cover のままなので左右は切れる（最大 49%）。
+   「上下比を固定する」と「切れる量を固定する」は両立しないため、前者を採った。
+   詳細は docs/superpowers/specs/2026-08-09-portrait-layout-design.md */
+@media (orientation: portrait) {
+  .wn-stage {
+    /* 倍率だけを差し替える。係数（2.6 / 2.2 / 1.9 …）は横持ちと共有したまま。
+       1.7 は「同じ端末を横持ちにしたときの文字サイズに揃う」値 */
+    --wn-u: 1.7cqw;
+    width: 100vw;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 50cqh は .wn-scene 自身ではなく祖先コンテナ ＝ .wn-stage に対して解決される */
+  .wn-scene { position: relative; inset: auto; width: 100%; height: 50cqh; flex: none; }
+
+  .wn-msg-area { position: relative; inset: auto; flex: 1 1 auto; min-height: 0; display: flex; }
+
+  .wn-messagebox {
+    position: relative;
+    left: auto; right: auto; bottom: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    /* 上の余白は話者名（top: -3.4u）が場面に食い込まない大きさにする */
+    margin: calc(4.5 * var(--wn-u)) calc(3 * var(--wn-u)) calc(3 * var(--wn-u));
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 本文は枠の残り全部。幅は padding と同じ式のままなので .wn-measure とずれない */
+  .wn-body { height: auto; flex: 1 1 auto; min-height: 0; }
+
+  /* 幅 390px に3つ並べると溢れる */
+  .wn-title-buttons { flex-wrap: wrap; justify-content: center; }
+
+  .wn-panel { width: 92cqw; }
+
+  /* 横4列は入らないので、名前と場所を1行目、本文と時刻を積む */
+  .wn-slot {
+    grid-template-columns: auto 1fr;
+    row-gap: calc(0.6 * var(--wn-u));
+  }
+  .wn-slot-preview, .wn-slot-time { grid-column: 1 / -1; }
+
+  /* 指で押せる大きさを確保する。文字サイズの係数では 44px に届かない */
+  .wn-button, .wn-choice, .wn-slot { min-height: 44px; }
+}
