@@ -59,6 +59,8 @@ export class Runtime {
   /** UI が接続されている場合だけページ分割を行う。テストとリプレイでは1ページ扱い */
   private paginate = false
   private pageBreaksResolve: ((breaks: number[]) => void) | null = null
+  /** 再測定の要求。クリック待ちを解いた理由がクリックか再測定かを区別する */
+  private repaginateRequested = false
   /** シーン入口のスナップショット。セーブはこれを書き出す */
   protected sceneEntry: Snapshot
   protected sceneIdx = 0
@@ -131,7 +133,9 @@ export class Runtime {
   }
 
   /**
-   * UI が測った「各ページの先頭文字位置」を渡す。`[0]` は常に補われる。
+   * UI が測った「各ページの先頭文字位置」を渡す。位置は `view.measureFrom` からの
+   * 相対値で、`[0]` は常に補われる。回転前に読み終えたページは測り直さないため、
+   * ここで絶対位置に直してから返す。
    * 意味を持つのは `isWaitingForPageBreaks()` が true のあいだだけで、
    * それ以外のときは無視する（本文の途中で区切りが変わると表示が破綻するため）。
    */
@@ -139,15 +143,33 @@ export class Runtime {
     const resolve = this.pageBreaksResolve
     if (!resolve) return
     this.pageBreaksResolve = null
+    const from = this.state.view.measureFrom
     const normalized = breaks[0] === 0 ? breaks : [0, ...breaks]
-    this.state.view.pageBreaks = normalized
-    this.emit()
-    resolve(normalized)
+    resolve(normalized.map((n) => n + from))
   }
 
   private waitForPageBreaks(): Promise<number[]> {
-    if (!this.paginate || this.replaying) return Promise.resolve([0])
+    // 測れる UI が無いときとリプレイ中は1ページ扱い。起点は measureFrom のまま
+    if (!this.paginate || this.replaying) return Promise.resolve([this.state.view.measureFrom])
     return new Promise<number[]>((resolve) => { this.pageBreaksResolve = resolve })
+  }
+
+  /**
+   * 画面の向きが変わったときに UI が呼ぶ。
+   * 受け付けるのはクリック待ちの瞬間だけで、そこから現在ページの先頭を起点に測り直す。
+   * 文字送りや演出の最中に区切りが変わると、表示済みの範囲と食い違って破綻する。
+   *
+   * 測れる UI が繋がっていないときも無視する。待ちだけ解くと本文が1つ進んでしまう。
+   * リプレイ中は phase が waiting にならないので実際には届かないが、多重防御として残す。
+   */
+  requestRepaginate(): void {
+    if (!this.paginate || this.replaying) return
+    if (this.state.view.phase !== 'waiting') return
+    const resolve = this.clickResolve
+    if (!resolve) return
+    this.repaginateRequested = true
+    this.clickResolve = null
+    resolve()
   }
 
   get saveSlots(): readonly string[] {
@@ -409,33 +431,56 @@ export class Runtime {
     this.state.progress.index = step.i
     this.state.view.currentText = { speaker: step.speaker, body: step.body }
     this.state.view.visibleChars = 0
+    this.state.view.measureFrom = 0
     this.state.view.pageBreaks = [0]
     this.state.view.page = { current: 0, total: 1 }
     this.state.view.phase = 'performing'
+    this.repaginateRequested = false
     this.emit()
 
-    // UI がこの本文を測り終えるまで待つ。ページ分割が無効なら即座に [0] が返る
-    const breaks = await this.waitForPageBreaks()
+    /** 読み終えたページの先頭位置。再測定でも失われないので、ページ番号は通し番号になる */
+    let head: number[] = []
+    /** 再測定の直後か。読んでいたページを打ち直さないために使う */
+    let resumed = false
 
-    for (let p = 0; p < breaks.length; p++) {
+    for (;;) {
+      // UI がこの本文を測り終えるまで待つ。ページ分割が無効なら即座に返る
+      const breaks = await this.waitForPageBreaks()
       // ロードで打ち切られていたら、ページを1つも進めずに降りる
       if (gen !== this.generation) return
-      const end = p + 1 < breaks.length ? breaks[p + 1] : step.body.length
-      this.state.view.page = { current: p, total: breaks.length }
+      this.state.view.pageBreaks = [...head, ...breaks]
+
+      let p = 0
+      for (; p < breaks.length; p++) {
+        if (gen !== this.generation) return
+        const end = p + 1 < breaks.length ? breaks[p + 1] : step.body.length
+        this.state.view.page = { current: head.length + p, total: head.length + breaks.length }
+        this.emit()
+        await this.type(step.body, breaks[p], end, resumed && p === 0)
+        // ページ送り待ちもセーブ可能点。画面が静止して次のクリックを待つ点は最終ページと同じ
+        await this.waitForClick()
+        if (gen !== this.generation) return
+        if (this.repaginateRequested) break
+      }
+      if (!this.repaginateRequested) return
+
+      // 読んでいたページの先頭から測り直す。起点を固定するのでページ番号はずれない
+      this.repaginateRequested = false
+      head = [...head, ...breaks.slice(0, p)]
+      this.state.view.measureFrom = breaks[p]
+      resumed = true
       this.emit()
-      await this.type(step.body, breaks[p], end)
-      // ページ送り待ちもセーブ可能点。画面が静止して次のクリックを待つ点は最終ページと同じ
-      await this.waitForClick()
     }
   }
 
   /**
    * ページの範囲 [from, to) を1文字ずつ visibleChars で開く。
    * リプレイ中と一括表示のときは即座に全文表示になる。
+   * `instant` は再測定の直後に立つ。読んでいたページを打ち直さないため。
    */
-  private async type(body: string, from: number, to: number): Promise<void> {
+  private async type(body: string, from: number, to: number, instant = false): Promise<void> {
     const delay = charDelayMs(this.settings, this.state.snapshot.speed)
-    if (this.replaying || delay === 0) {
+    if (this.replaying || delay === 0 || instant) {
       this.state.view.visibleChars = to
       this.emit()
       return

@@ -30,6 +30,8 @@ export type EngineState = {
     phase: Phase
     currentText: { speaker: string | null; body: string } | null
     visibleChars: number
+    /** ページの測定をどこから始めるか。回転前に読み終えた分は測り直さない */
+    measureFrom: number
     /** ページの先頭文字位置。[0] は常に 0。UI が測定して渡す */
     pageBreaks: number[]
     page: { current: number; total: number }
@@ -51,6 +53,7 @@ export function initialState(sceneId: string): EngineState {
       phase: 'performing',
       currentText: null,
       visibleChars: 0,
+      measureFrom: 0,
       pageBreaks: [0],
       page: { current: 0, total: 1 },
       fadeMs: 0,
