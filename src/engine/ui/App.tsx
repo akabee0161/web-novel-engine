@@ -70,6 +70,19 @@ export function App({ runtime }: { runtime: Runtime }) {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [runtime])
 
+  /**
+   * 画面の回転でメッセージ枠の形が変わると、収まっていた文字が隠れて読めなくなる。
+   * コアが安全な瞬間（クリック待ち）だけ受け付けるので、ここは要求を投げるだけでよい。
+   *
+   * resize は使わない。モバイルは URL バーの伸縮で頻発するため、向きの変化だけを見る。
+   */
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: portrait)')
+    const onChange = () => runtime.requestRepaginate()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [runtime])
+
   return (
     <div className="wn-viewport">
       {/* data-phase は CSS の演出フックであり、E2E が進行を決定的に待つための手掛かりでもある */}

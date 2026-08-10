@@ -616,3 +616,69 @@ test('縦持ちでも立ち絵は場面の 88% に収まる', async ({ page }) =
   // 場面からはみ出さない
   expect(sprite.height).toBeLessThan(scene.height)
 })
+
+/**
+ * 回転で枠の形が変わると、収まっていた文字が overflow で隠れて読めなくなる。
+ * クリック待ちの瞬間に、読んでいたページの先頭から割り直す。
+ *
+ * 本文の一致だけでは「割り直しが実際に起きたか」を判定できない。
+ * CSS の overflow は視覚的にクリップするだけで DOM のテキストは消えないため、
+ * 割り直しをサボって既存のページ境界をそのまま辿っても、本文の連続性チェックは
+ * 素通りしてしまう（実測済み: 何も実装しなくても本文一致の assert は通った）。
+ * そこで縦持ちと横持ちに極端に異なる font-size を当て、割り直しが起きたことを
+ * 総ページ数（分母）の変化で検出する。割り直しが走らなければ分母は据え置きのまま
+ * 変わらない。
+ */
+test('本文の途中で画面を回すと、読んでいた位置からページを割り直す', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  // 縦持ちは1行に収まる大きさ、横持ちはさらに大きくして総ページ数を増やす
+  await page.addStyleTag({ content: `
+    .wn-messagebox { font-size: 14cqw !important; }
+    @media (orientation: landscape) { .wn-messagebox { font-size: 26cqw !important; } }
+  ` })
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+  await settle(page)
+
+  const indicator = page.locator('.wn-page')
+  // 縦持ちで複数ページに割れていること（割れていなければ font-size を上げる）
+  await expect(indicator).toHaveText(/1 \/ [2-9]/)
+
+  await tap(page)
+  await settle(page)
+  await expect(indicator).toHaveText(/2 \/ \d+/)
+  const [, totalBefore] = (await indicator.textContent())!.split('/').map(Number)
+  const before = (await body(page).textContent())!
+
+  // 横持ちに回す
+  await page.setViewportSize({ width: 844, height: 390 })
+  await settle(page)
+
+  // 割り直しが実際に起きたことを、総ページ数の変化で確認する。
+  // 再測定中も phase は waiting のままなので settle() では待てない。
+  // 割り直しが走らなければ分母は据え置きのままで、ここがタイムアウトする
+  await expect
+    .poll(async () => (await indicator.textContent())!.split('/').map(Number)[1])
+    .not.toBe(totalBefore)
+  // ページ番号は戻らない（通し番号のまま）
+  await expect(indicator).toHaveText(/2 \/ \d+/)
+  // 読んでいた位置が新しいページの先頭に来る。どちらかがもう一方の先頭一致になる
+  const after = (await body(page).textContent())!
+  expect(after.startsWith(before) || before.startsWith(after)).toBe(true)
+
+  // 割り直しても本文は落ちない。最後まで送ると全文が揃う
+  const rest: string[] = [after]
+  for (;;) {
+    const [current, total] = (await indicator.textContent())!.split('/').map(Number)
+    if (current === total) break
+    await tap(page)
+    await expect(indicator).toHaveText(`${current + 1} / ${total}`)
+    await settle(page)
+    rest.push((await body(page).textContent())!)
+  }
+  expect(FIRST_BODY.endsWith(rest.join(''))).toBe(true)
+  // 空のページが出ないこと。読み終えた分を差し引かずに測ると、割り位置が本文の
+  // 長さを追い越して末尾に空ページが生える
+  expect(rest.every((t) => t.length > 0)).toBe(true)
+})
