@@ -14,8 +14,13 @@ export type ParseResult = {
 }
 
 export class WnError extends Error {
-  constructor(readonly file: string, readonly line: number, message: string) {
+  readonly file: string
+  readonly line: number
+
+  constructor(file: string, line: number, message: string) {
     super(`${file}:${line}: ${message}`)
+    this.file = file
+    this.line = line
     this.name = 'WnError'
   }
 }
