@@ -133,7 +133,7 @@ describe('ページ送り', () => {
     expect(r.getState().view.page).toEqual({ current: 0, total: 1 })
   })
 
-  it('クリック待ちでないときの再測定要求は無視される', async () => {
+  it('クリック待ちでないときの再測定要求は、捨てずに次のクリック待ちで消費される', async () => {
     const r = make()
     r.enablePagination()
     void r.start()
@@ -143,9 +143,35 @@ describe('ページ送り', () => {
     r.requestRepaginate()
 
     r.setPageBreaks([0, 4])
-    await wait(r)
+    // 読者のクリックを挟まずに測り直しへ降りる
+    await waitMeasure(r)
     expect(r.getState().view.measureFrom).toBe(0)
-    expect(r.getState().view.page).toEqual({ current: 0, total: 2 })
+
+    r.setPageBreaks([0, 5])
+    await vi.waitFor(() => expect(r.getState().view.page).toEqual({ current: 0, total: 2 }))
+    expect(r.getState().view.pageBreaks).toEqual([0, 5])
+  })
+
+  it('文字送り中の再測定要求は、打ち切った直後のクリック待ちで消費される', async () => {
+    const r = new Runtime({ script, novelId: 'n', baseUrl: 'https://x.test/' })
+    r.setSettings({ ...DEFAULT_SETTINGS, textMode: 'sequential', textSpeed: 'fast' })
+    r.enablePagination()
+    void r.start()
+    await waitMeasure(r)
+    r.setPageBreaks([0, 4, 8])                      // 3ページ
+    await vi.waitFor(() => expect(r.getState().view.phase).toBe('typing'))
+
+    // 回転は文字送りの最中に届く。ここで測り直すと表示済みの範囲と食い違う
+    r.requestRepaginate()
+    expect(r.isWaitingForPageBreaks()).toBe(false)
+
+    r.advance()                                     // 文字送りを打ち切る
+    // ページ送りのクリックを待たずに測り直しへ降りる
+    await waitMeasure(r)
+    expect(r.getState().view.measureFrom).toBe(0)
+
+    r.setPageBreaks([0, 2, 4, 6])                   // 狭い枠では4ページに割れた
+    await vi.waitFor(() => expect(r.getState().view.page).toEqual({ current: 0, total: 4 }))
   })
 
   it('ページ分割が無効なら、再測定要求はクリック待ちを解かない', async () => {

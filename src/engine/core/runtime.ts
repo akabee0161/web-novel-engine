@@ -155,19 +155,23 @@ export class Runtime {
   }
 
   /**
-   * 画面の向きが変わったときに UI が呼ぶ。
-   * 受け付けるのはクリック待ちの瞬間だけで、そこから現在ページの先頭を起点に測り直す。
-   * 文字送りや演出の最中に区切りが変わると、表示済みの範囲と食い違って破綻する。
+   * 画面の向きが変わったときに UI が呼ぶ。要求は**捨てずに預かる**。
    *
-   * 測れる UI が繋がっていないときも無視する。待ちだけ解くと本文が1つ進んでしまう。
-   * リプレイ中は phase が waiting にならないので実際には届かないが、多重防御として残す。
+   * 割り直してよいのはクリック待ちの瞬間だけだが、受け付けを待ちの瞬間に限ると、
+   * 文字送りや演出の最中に回した分がどこにも残らない。次に待ちへ来ても測り直さず、
+   * その本文ブロックの残りを古い区切りのまま読ませることになる
+   * （狭くなった枠では末尾が `overflow: hidden` で隠れる）。
+   * ここではフラグを立てるだけにして、消費は `waitForClick()` に任せる。
+   *
+   * 測れる UI が繋がっていないときは無視する。待ちだけ解くと本文が1つ進んでしまう。
+   * リプレイ中は測定そのものをしないので、預かっても消費先が無い。
    */
   requestRepaginate(): void {
     if (!this.paginate || this.replaying) return
-    if (this.state.view.phase !== 'waiting') return
+    this.repaginateRequested = true
+    // すでにクリック待ちなら、その待ちをここで解いて即座に測り直しへ降ろす
     const resolve = this.clickResolve
     if (!resolve) return
-    this.repaginateRequested = true
     this.clickResolve = null
     resolve()
   }
@@ -510,6 +514,10 @@ export class Runtime {
     if (this.replaying) return Promise.resolve()
     this.state.view.phase = 'waiting'
     this.emit()
+    // 預かっている再測定の要求は、文字送りが終わったここで初めて安全に消費できる。
+    // クリックを待ってからでは、古い区切りのまま1ページ読ませてしまう。
+    // セーブ可能点として通知しないのは、この直後に割り直しが走るため
+    if (this.repaginateRequested) return Promise.resolve()
     this.onSaveable?.()
     return new Promise<void>((resolve) => {
       this.clickResolve = resolve

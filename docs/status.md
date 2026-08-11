@@ -69,7 +69,7 @@ UI が Range API で測って境界をコアに渡し、ページに分かれて
 | 場所 | すること |
 |---|---|
 | `waitForClick` / `perform` / `type` | 待たずに即座に進む |
-| `waitForPageBreaks` / `requestRepaginate` | 測定しない・再測定を受け付けない |
+| `waitForPageBreaks` / `requestRepaginate` | 測定しない・再測定の要求を預からない |
 | `bgm` / `se` | 音を鳴らさない |
 | `exec` 先頭 | 復元位置に着いたらリプレイを終える |
 
@@ -83,8 +83,8 @@ UI が Range API で測って境界をコアに渡し、ページに分かれて
 |---|---|
 | `npm run typecheck` | — |
 | `npm run lint` | — |
-| `npm test` | Vitest 124件 |
-| `npm run test:e2e` | Playwright 24件。DOM に関わる変更のときだけでよい |
+| `npm test` | Vitest 125件 |
+| `npm run test:e2e` | Playwright 25件。DOM に関わる変更のときだけでよい |
 
 > E2E は既定の並列実行（6 workers）で稀に落ちる（音声テストのタイムアウト）。
 > 縦持ちの実装より前から起きている。確実に見たいときは `--workers=1` を付ける。
@@ -153,7 +153,9 @@ UI が Range API で測って境界をコアに渡し、ページに分かれて
 11. **演出の完了はコアのタイマーで判定する。** `transitionend` を使わない。
     使うとリプレイ（描画を伴わない高速再生）で完了を検知できなくなる。
 12. **画面の回転はクリック待ちの瞬間だけ反映される。** 起点は現在ページの先頭で、
-    ページ番号は通し番号を保つ。`resize` は購読しない（URL バーの伸縮で頻発するため）。
+    ページ番号は通し番号を保つ。文字送りや演出の最中に回した分は**捨てずに預かり**、
+    次のクリック待ちで1回だけ消費する。
+    `resize` は購読しない（URL バーの伸縮で頻発するため）。
     これは [2026-08-09 の決定](decisions/2026-08-09-implementation-decisions.md) の決定3を
     [縦持ちの決定](decisions/2026-08-09-portrait-layout.md) で覆したもの。
 

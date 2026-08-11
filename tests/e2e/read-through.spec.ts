@@ -682,3 +682,47 @@ test('本文の途中で画面を回すと、読んでいた位置からペー�
   // 長さを追い越して末尾に空ページが生える
   expect(rest.every((t) => t.length > 0)).toBe(true)
 })
+
+/**
+ * 回転は文字送りの最中にも届く。割り直してよいのはクリック待ちだけなので、
+ * 届いた要求をその場で捨てると、次に待ちへ来ても測り直さない。その本文ブロックの
+ * 残りは古い区切りのまま進み、狭くなった枠では末尾が overflow で隠れたままになる。
+ *
+ * 見るのは「読者がクリックを挟まずに分母が変わること」。要求が捨てられていれば
+ * 分母は据え置きのままで、poll がタイムアウトする。
+ */
+test('文字送りの最中に画面を回しても、次のクリック待ちで割り直される', async ({ page }) => {
+  // 文字送りを遅くして、回しているあいだ typing のままでいられる幅を作る
+  await page.addInitScript(() => {
+    localStorage.setItem('wn:kieta-ippen:system', JSON.stringify({ settings: { textSpeed: 'slow' } }))
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  // 本文の長いブロックから始める。冒頭の短い本文では回す前に文字送りが終わる
+  await page.goto('/?scene=' + encodeURIComponent('廊下') + '&index=0')
+  // 縦持ちと横持ちで極端に文字の大きさを変え、割り直しを分母の変化で検出する
+  await page.addStyleTag({ content: `
+    .wn-messagebox { font-size: 14cqw !important; }
+    @media (orientation: landscape) { .wn-messagebox { font-size: 26cqw !important; } }
+  ` })
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+
+  const indicator = page.locator('.wn-page')
+  await expect(indicator).toHaveText(/1 \/ [2-9]/)
+  const [, totalBefore] = (await indicator.textContent())!.split('/').map(Number)
+
+  // settle() を挟まない。文字送りが続いているあいだに回す
+  expect(await phase(page)).toBe('typing')
+  await page.setViewportSize({ width: 844, height: 390 })
+  // 回した時点でまだ文字送り中だったこと。waiting まで進んでいたなら
+  // 従来の経路を通っただけで、この検証は空振りになる
+  expect(await phase(page)).toBe('typing')
+
+  // クリックを挟まずに分母が変わる
+  await expect
+    .poll(async () => (await indicator.textContent())!.split('/').map(Number)[1])
+    .not.toBe(totalBefore)
+  // 読んでいたページの先頭は動かず、ページ番号も戻らない
+  await expect(indicator).toHaveText(/1 \/ \d+/)
+  await expect(stage(page)).toHaveAttribute('data-phase', 'waiting')
+})
