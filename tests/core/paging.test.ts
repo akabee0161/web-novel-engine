@@ -132,4 +132,113 @@ describe('ページ送り', () => {
     expect(r.getState().view.currentText?.body).toBe('次')
     expect(r.getState().view.page).toEqual({ current: 0, total: 1 })
   })
+
+  it('クリック待ちでないときの再測定要求は、捨てずに次のクリック待ちで消費される', async () => {
+    const r = make()
+    r.enablePagination()
+    void r.start()
+    await waitMeasure(r)
+    // まだ測定待ち。クリック待ちではない
+    expect(r.getState().view.phase).toBe('performing')
+    r.requestRepaginate()
+
+    r.setPageBreaks([0, 4])
+    // 読者のクリックを挟まずに測り直しへ降りる
+    await waitMeasure(r)
+    expect(r.getState().view.measureFrom).toBe(0)
+
+    r.setPageBreaks([0, 5])
+    await vi.waitFor(() => expect(r.getState().view.page).toEqual({ current: 0, total: 2 }))
+    expect(r.getState().view.pageBreaks).toEqual([0, 5])
+  })
+
+  it('文字送り中の再測定要求は、打ち切った直後のクリック待ちで消費される', async () => {
+    const r = new Runtime({ script, novelId: 'n', baseUrl: 'https://x.test/' })
+    r.setSettings({ ...DEFAULT_SETTINGS, textMode: 'sequential', textSpeed: 'fast' })
+    r.enablePagination()
+    void r.start()
+    await waitMeasure(r)
+    r.setPageBreaks([0, 4, 8])                      // 3ページ
+    await vi.waitFor(() => expect(r.getState().view.phase).toBe('typing'))
+
+    // 回転は文字送りの最中に届く。ここで測り直すと表示済みの範囲と食い違う
+    r.requestRepaginate()
+    expect(r.isWaitingForPageBreaks()).toBe(false)
+
+    r.advance()                                     // 文字送りを打ち切る
+    // ページ送りのクリックを待たずに測り直しへ降りる
+    await waitMeasure(r)
+    expect(r.getState().view.measureFrom).toBe(0)
+
+    r.setPageBreaks([0, 2, 4, 6])                   // 狭い枠では4ページに割れた
+    await vi.waitFor(() => expect(r.getState().view.page).toEqual({ current: 0, total: 4 }))
+  })
+
+  it('ページ分割が無効なら、再測定要求はクリック待ちを解かない', async () => {
+    const r = make()          // enablePagination() を呼ばない
+    void r.start()
+    await wait(r)
+    r.requestRepaginate()
+    await new Promise((done) => setTimeout(done, 20))
+    // 測れる UI が無いのに待ちを解くと、本文が1つ勝手に進んでしまう
+    expect(r.getState().view.currentText?.body).toBe('0123456789')
+  })
+
+  it('リプレイ中の再測定要求は無視される', async () => {
+    const r = make()
+    r.enablePagination()
+    void r.load({ scene: 'A', index: 1, snapshot: r.getState().snapshot })
+    r.requestRepaginate()
+    await waitMeasure(r)
+    r.setPageBreaks([0])
+    await wait(r)
+    expect(r.getState().view.measureFrom).toBe(0)
+    expect(r.getState().view.currentText?.body).toBe('次')
+  })
+
+  it('再測定は現在ページの先頭を起点にし、ページ番号は戻らない', async () => {
+    const r = make()
+    r.enablePagination()
+    void r.start()
+    await waitMeasure(r)
+    r.setPageBreaks([0, 4, 8])            // 3ページ
+    await wait(r)
+    await nextPage(r)                      // 2ページ目。文字位置 4 から
+    expect(r.getState().view.page).toEqual({ current: 1, total: 3 })
+
+    r.requestRepaginate()
+    await waitMeasure(r)
+    // 起点は現在ページの先頭。UI はここからの相対位置を返す
+    expect(r.getState().view.measureFrom).toBe(4)
+    r.setPageBreaks([0, 2, 4])             // 残り6文字が3ページに割れた
+
+    await vi.waitFor(() => expect(r.getState().view.page.total).toBe(4))
+    // 読み終えた1ページ分は残り、以降が差し替わる。添字は通し番号のまま引ける
+    expect(r.getState().view.pageBreaks).toEqual([0, 4, 6, 8])
+    expect(r.getState().view.page).toEqual({ current: 1, total: 4 })
+    expect(r.getState().view.visibleChars).toBe(6)
+  })
+
+  it('再測定の直後は、読んでいたページを打ち直さない', async () => {
+    const r = new Runtime({ script, novelId: 'n', baseUrl: 'https://x.test/' })
+    r.setSettings({ ...DEFAULT_SETTINGS, textMode: 'sequential', textSpeed: 'fast' })
+    r.enablePagination()
+    void r.start()
+    await waitMeasure(r)
+    r.setPageBreaks([0, 4])
+    await vi.waitFor(() => expect(r.getState().view.phase).toBe('typing'))
+    r.advance()                            // 文字送りを打ち切ってクリック待ちへ
+    await wait(r)
+
+    const phases: string[] = []
+    const off = r.subscribe(() => phases.push(r.getState().view.phase))
+    r.requestRepaginate()
+    await waitMeasure(r)
+    r.setPageBreaks([0, 2])
+    await vi.waitFor(() => expect(r.getState().view.visibleChars).toBe(2))
+    off()
+
+    // 回すたびに読んでいた段落が打ち直されるのは事故に見える
+    expect(phases).not.toContain('typing')
+  })
 })

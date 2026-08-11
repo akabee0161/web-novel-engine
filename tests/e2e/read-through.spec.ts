@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 declare global {
   interface Window {
@@ -34,8 +34,12 @@ const readSprites = (page: Page) =>
 
 const phase = (page: Page) => stage(page).getAttribute('data-phase')
 
-/** ステージのどこでもよいが、メッセージ枠を避けて上部を押す */
-const tap = (page: Page) => stage(page).click({ position: { x: 640, y: 120 } })
+/** ステージのどこでもよいが、メッセージ枠を避けて上部を押す。
+    縦持ちでも枠の外に当たるよう、絶対座標ではなくステージ幅に対する比で指す */
+const tap = async (page: Page) => {
+  const box = (await stage(page).boundingBox())!
+  await stage(page).click({ position: { x: box.width * 0.5, y: box.height * 0.15 } })
+}
 
 async function startReading(page: Page) {
   await page.goto('/')
@@ -507,12 +511,218 @@ test('存在しないシーンを指定したら、黙って先頭から始め�
   await expect(page.locator('.wn-title')).toBeVisible()
 })
 
-test('ステージは縦長でも横長でも 16:9 を保つ', async ({ page }) => {
+test('横持ちはステージが 16:9、縦持ちはビューポート全体を使う', async ({ page }) => {
   await page.goto('/')
-  for (const size of [{ width: 900, height: 1400 }, { width: 1600, height: 500 }]) {
-    await page.setViewportSize(size)
-    const box = await stage(page).boundingBox()
-    expect(box).not.toBeNull()
-    expect(box!.width / box!.height).toBeCloseTo(16 / 9, 2)
+
+  // 横長: ステージが 16:9 でレターボックスされる
+  await page.setViewportSize({ width: 1600, height: 500 })
+  const wide = (await stage(page).boundingBox())!
+  expect(wide.width / wide.height).toBeCloseTo(16 / 9, 2)
+
+  // 縦長: レターボックスをやめ、ビューポート全体をステージにする
+  await page.setViewportSize({ width: 900, height: 1400 })
+  const tall = (await stage(page).boundingBox())!
+  expect(tall.width).toBeCloseTo(900, 0)
+  expect(tall.height).toBeCloseTo(1400, 0)
+})
+
+/** 計算後のスタイルを数値で取る。'33.28px' → 33.28 */
+const cssPx = (loc: Locator, prop: string) =>
+  loc.evaluate((el, p) => parseFloat(getComputedStyle(el).getPropertyValue(p)), prop)
+
+/**
+ * 寸法は基準解像度に対する比で決まる。1280 幅なら本文は 2.6% = 33.28px。
+ * 倍率変数（--wn-u）を入れても横持ちの見た目が変わらないことを、この数字で押さえる。
+ */
+test('横持ちの寸法はステージ幅に対する比で決まる', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  // .wn-speaker は本文ブロックに話者がいないと出ない。FIRST_BODY は地の文なので、
+  // 話者（トオル）がいる屋上前シーンの3ブロック目から始める
+  await page.goto('/?scene=' + encodeURIComponent('屋上前') + '&index=2')
+
+  expect(await cssPx(page.locator('.wn-title h1'), 'font-size')).toBeCloseTo(76.8, 1)
+  expect(await cssPx(page.locator('.wn-title .wn-button').first(), 'font-size')).toBeCloseTo(30.72, 1)
+
+  await page.getByRole('button', { name: '設定' }).click()
+  expect(await cssPx(page.locator('.wn-panel'), 'width')).toBeCloseTo(1024, 0)
+  expect(await cssPx(page.locator('.wn-panel'), 'font-size')).toBeCloseTo(28.16, 1)
+  await page.getByRole('button', { name: '閉じる' }).click()
+
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+  expect(await cssPx(page.locator('.wn-messagebox'), 'font-size')).toBeCloseTo(33.28, 1)
+  expect(await cssPx(page.locator('.wn-body'), 'height')).toBeCloseTo(192, 0)
+  expect(await cssPx(page.locator('.wn-speaker'), 'font-size')).toBeCloseTo(28.16, 1)
+
+  // .wn-body と .wn-measure は同じ幅でなければならない（片方だけ直すとページ測定がずれる）
+  const bodyWidth = await cssPx(page.locator('.wn-body'), 'width')
+  expect(await cssPx(page.locator('.wn-measure'), 'width')).toBeCloseTo(bodyWidth, 1)
+})
+
+/**
+ * 立ち絵の高さは「場面」の 88%。横持ちでは場面＝ステージなので現状と同じ値になるが、
+ * 縦持ちで場面が上半分になったときに巨大化しないための基準はここにある。
+ */
+test('立ち絵の高さは場面の 88%', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.goto('/?scene=' + encodeURIComponent('屋上前') + '&index=2')
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-sprite')
+
+  const scene = (await page.locator('.wn-scene').boundingBox())!
+  const sprite = (await page.locator('.wn-sprite').first().boundingBox())!
+  expect(sprite.height).toBeCloseTo(scene.height * 0.88, 0)
+})
+
+/** iPhone 14 相当。設計ドキュメントの表と同じ数字を検証する */
+test('縦持ちは上下 50:50 に分割され、下は全部が本文枠になる', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+
+  const st = (await stage(page).boundingBox())!
+  expect(st.width).toBeCloseTo(390, 0)
+  expect(st.height).toBeCloseTo(844, 0)
+
+  // 場面は画面高の 50%。16:9 ではない（背景は cover で左右が切れる）
+  const scene = (await page.locator('.wn-scene').boundingBox())!
+  expect(scene.width).toBeCloseTo(390, 0)
+  expect(scene.height).toBeCloseTo(422, 0)
+
+  // 場面の下は黒を残さず、全部を本文枠の領域が使う
+  const area = (await page.locator('.wn-msg-area').boundingBox())!
+  expect(area.y).toBeCloseTo(scene.y + scene.height, 0)
+  expect(area.height).toBeCloseTo(844 - 422, 0)
+
+  // 文字は横持ち相当まで拡大される（係数 2.6 × 倍率 1.7）
+  expect(await cssPx(page.locator('.wn-messagebox'), 'font-size')).toBeCloseTo(390 * 0.026 * 1.7, 1)
+  // 測定用の要素は本文と同じ幅でなければならない
+  const bodyWidth = await cssPx(page.locator('.wn-body'), 'width')
+  expect(await cssPx(page.locator('.wn-measure'), 'width')).toBeCloseTo(bodyWidth, 1)
+  // 本文は枠の残り全部を使う（横持ちの固定高ではない）
+  expect(await cssPx(page.locator('.wn-body'), 'height')).toBeGreaterThan(200)
+})
+
+test('縦持ちでも立ち絵は場面の 88% に収まる', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/?scene=' + encodeURIComponent('屋上前') + '&index=2')
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-sprite')
+
+  const scene = (await page.locator('.wn-scene').boundingBox())!
+  const sprite = (await page.locator('.wn-sprite').first().boundingBox())!
+  expect(sprite.height).toBeCloseTo(scene.height * 0.88, 0)
+  // 場面からはみ出さない
+  expect(sprite.height).toBeLessThan(scene.height)
+})
+
+/**
+ * 回転で枠の形が変わると、収まっていた文字が overflow で隠れて読めなくなる。
+ * クリック待ちの瞬間に、読んでいたページの先頭から割り直す。
+ *
+ * 本文の一致だけでは「割り直しが実際に起きたか」を判定できない。
+ * CSS の overflow は視覚的にクリップするだけで DOM のテキストは消えないため、
+ * 割り直しをサボって既存のページ境界をそのまま辿っても、本文の連続性チェックは
+ * 素通りしてしまう（実測済み: 何も実装しなくても本文一致の assert は通った）。
+ * そこで縦持ちと横持ちに極端に異なる font-size を当て、割り直しが起きたことを
+ * 総ページ数（分母）の変化で検出する。割り直しが走らなければ分母は据え置きのまま
+ * 変わらない。
+ */
+test('本文の途中で画面を回すと、読んでいた位置からページを割り直す', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  // 縦持ちは1行に収まる大きさ、横持ちはさらに大きくして総ページ数を増やす
+  await page.addStyleTag({ content: `
+    .wn-messagebox { font-size: 14cqw !important; }
+    @media (orientation: landscape) { .wn-messagebox { font-size: 26cqw !important; } }
+  ` })
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+  await settle(page)
+
+  const indicator = page.locator('.wn-page')
+  // 縦持ちで複数ページに割れていること（割れていなければ font-size を上げる）
+  await expect(indicator).toHaveText(/1 \/ [2-9]/)
+
+  await tap(page)
+  await settle(page)
+  await expect(indicator).toHaveText(/2 \/ \d+/)
+  const [, totalBefore] = (await indicator.textContent())!.split('/').map(Number)
+  const before = (await body(page).textContent())!
+
+  // 横持ちに回す
+  await page.setViewportSize({ width: 844, height: 390 })
+  await settle(page)
+
+  // 割り直しが実際に起きたことを、総ページ数の変化で確認する。
+  // 再測定中も phase は waiting のままなので settle() では待てない。
+  // 割り直しが走らなければ分母は据え置きのままで、ここがタイムアウトする
+  await expect
+    .poll(async () => (await indicator.textContent())!.split('/').map(Number)[1])
+    .not.toBe(totalBefore)
+  // ページ番号は戻らない（通し番号のまま）
+  await expect(indicator).toHaveText(/2 \/ \d+/)
+  // 読んでいた位置が新しいページの先頭に来る。どちらかがもう一方の先頭一致になる
+  const after = (await body(page).textContent())!
+  expect(after.startsWith(before) || before.startsWith(after)).toBe(true)
+
+  // 割り直しても本文は落ちない。最後まで送ると全文が揃う
+  const rest: string[] = [after]
+  for (;;) {
+    const [current, total] = (await indicator.textContent())!.split('/').map(Number)
+    if (current === total) break
+    await tap(page)
+    await expect(indicator).toHaveText(`${current + 1} / ${total}`)
+    await settle(page)
+    rest.push((await body(page).textContent())!)
   }
+  expect(FIRST_BODY.endsWith(rest.join(''))).toBe(true)
+  // 空のページが出ないこと。読み終えた分を差し引かずに測ると、割り位置が本文の
+  // 長さを追い越して末尾に空ページが生える
+  expect(rest.every((t) => t.length > 0)).toBe(true)
+})
+
+/**
+ * 回転は文字送りの最中にも届く。割り直してよいのはクリック待ちだけなので、
+ * 届いた要求をその場で捨てると、次に待ちへ来ても測り直さない。その本文ブロックの
+ * 残りは古い区切りのまま進み、狭くなった枠では末尾が overflow で隠れたままになる。
+ *
+ * 見るのは「読者がクリックを挟まずに分母が変わること」。要求が捨てられていれば
+ * 分母は据え置きのままで、poll がタイムアウトする。
+ */
+test('文字送りの最中に画面を回しても、次のクリック待ちで割り直される', async ({ page }) => {
+  // 文字送りを遅くして、回しているあいだ typing のままでいられる幅を作る
+  await page.addInitScript(() => {
+    localStorage.setItem('wn:kieta-ippen:system', JSON.stringify({ settings: { textSpeed: 'slow' } }))
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  // 本文の長いブロックから始める。冒頭の短い本文では回す前に文字送りが終わる
+  await page.goto('/?scene=' + encodeURIComponent('廊下') + '&index=0')
+  // 縦持ちと横持ちで極端に文字の大きさを変え、割り直しを分母の変化で検出する
+  await page.addStyleTag({ content: `
+    .wn-messagebox { font-size: 14cqw !important; }
+    @media (orientation: landscape) { .wn-messagebox { font-size: 26cqw !important; } }
+  ` })
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await page.waitForSelector('.wn-messagebox')
+
+  const indicator = page.locator('.wn-page')
+  await expect(indicator).toHaveText(/1 \/ [2-9]/)
+  const [, totalBefore] = (await indicator.textContent())!.split('/').map(Number)
+
+  // settle() を挟まない。文字送りが続いているあいだに回す
+  expect(await phase(page)).toBe('typing')
+  await page.setViewportSize({ width: 844, height: 390 })
+  // 回した時点でまだ文字送り中だったこと。waiting まで進んでいたなら
+  // 従来の経路を通っただけで、この検証は空振りになる
+  expect(await phase(page)).toBe('typing')
+
+  // クリックを挟まずに分母が変わる
+  await expect
+    .poll(async () => (await indicator.textContent())!.split('/').map(Number)[1])
+    .not.toBe(totalBefore)
+  // 読んでいたページの先頭は動かず、ページ番号も戻らない
+  await expect(indicator).toHaveText(/1 \/ \d+/)
+  await expect(stage(page)).toHaveAttribute('data-phase', 'waiting')
 })

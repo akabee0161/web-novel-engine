@@ -4,3 +4,6 @@ dist/
 # Playwright の生成物
 test-results/
 playwright-report/
+
+# 計画実行の作業記録（進捗台帳・レビュー用の差分）。履歴に残すのはコミットのほう
+.superpowers/

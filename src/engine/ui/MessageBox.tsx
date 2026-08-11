@@ -17,13 +17,17 @@ export function MessageBox({ runtime, state }: Props) {
    * 依存配列を置かず、毎レンダで「待っているか」を見る。本文をキーにすると、
    * 同じ本文が2回続いたときや、同じブロックへロードし直したときに
    * 効果が再実行されず、コアが測定待ちのまま止まる。
+   *
+   * 測るのは measureFrom 以降だけ。回転しても読み終えたページは測り直さない
+   * （返す位置も measureFrom からの相対値。絶対位置に直すのはコアの責務）。
    */
   useLayoutEffect(() => {
     if (!runtime.isWaitingForPageBreaks()) return
     const host = measureRef.current
     const box = bodyRef.current
     if (!host || !box || !text) return
-    runtime.setPageBreaks(computePageBreaks(host, text.body, box.clientHeight))
+    const rest = text.body.slice(state.view.measureFrom)
+    runtime.setPageBreaks(computePageBreaks(host, rest, box.clientHeight))
   })
 
   if (!text) return null

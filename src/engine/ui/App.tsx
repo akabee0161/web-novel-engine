@@ -70,6 +70,20 @@ export function App({ runtime }: { runtime: Runtime }) {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [runtime])
 
+  /**
+   * 画面の回転でメッセージ枠の形が変わると、収まっていた文字が隠れて読めなくなる。
+   * コアが要求を預かり、安全な瞬間（クリック待ち）まで持ち越して割り直す。
+   * ここは向きが変わったことを伝えるだけでよく、いつ効かせるかを UI が持つ必要はない。
+   *
+   * resize は使わない。モバイルは URL バーの伸縮で頻発するため、向きの変化だけを見る。
+   */
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: portrait)')
+    const onChange = () => runtime.requestRepaginate()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [runtime])
+
   return (
     <div className="wn-viewport">
       {/* data-phase は CSS の演出フックであり、E2E が進行を決定的に待つための手掛かりでもある */}
@@ -85,7 +99,9 @@ export function App({ runtime }: { runtime: Runtime }) {
         {started ? (
           <>
             <Stage runtime={runtime} state={state} />
-            <MessageBox runtime={runtime} state={state} />
+            <div className="wn-msg-area">
+              <MessageBox runtime={runtime} state={state} />
+            </div>
             {/* 演出中・文字送り中は導線ごと出さない。開ける条件はセーブ可能点と同じ */}
             {ui === 'none' && runtime.canOpenUi() && (
               <div className="wn-corner" onClick={(e) => e.stopPropagation()}>
