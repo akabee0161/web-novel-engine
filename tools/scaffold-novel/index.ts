@@ -12,12 +12,23 @@ export type ScaffoldNovelOptions = {
 
 const ASSET_SUBDIRS = ['bg', 'bgm', 'chara', 'se']
 
+/** 作品IDとして許可する文字。パストラバーサル（`../` 等）を防ぐ */
+const ID_PATTERN = /^[A-Za-z0-9-]+$/
+
 /**
  * 既存作品を雛形に、新規作品ディレクトリを作る。
  * script.wn は含まない（novel-to-wn スキルが別途生成する）。
  */
 export function scaffoldNovel(opts: ScaffoldNovelOptions): { dir: string } {
   const { novelsDir, templateId, novelId } = opts
+
+  if (!ID_PATTERN.test(templateId)) {
+    throw new Error(`雛形の作品IDが不正: ${templateId}`)
+  }
+  if (!ID_PATTERN.test(novelId)) {
+    throw new Error(`新規作品IDが不正: ${novelId}`)
+  }
+
   const templateDir = join(novelsDir, templateId)
   const targetDir = join(novelsDir, novelId)
 
@@ -28,9 +39,12 @@ export function scaffoldNovel(opts: ScaffoldNovelOptions): { dir: string } {
     throw new Error(`作品ディレクトリが既に存在する: ${targetDir}`)
   }
 
+  // 対象ディレクトリを作る前に雛形を検証する。失敗時に不完全なディレクトリを残さないため
+  const mainTs = buildMainTs(templateDir, novelId)
+
   mkdirSync(targetDir, { recursive: true })
   writeFileSync(join(targetDir, 'index.html'), buildIndexHtml(novelId))
-  writeFileSync(join(targetDir, 'main.ts'), buildMainTs(templateDir, novelId))
+  writeFileSync(join(targetDir, 'main.ts'), mainTs)
 
   for (const sub of ASSET_SUBDIRS) {
     const dir = join(targetDir, 'public', sub)

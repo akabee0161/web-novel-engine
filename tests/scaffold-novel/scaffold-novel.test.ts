@@ -79,4 +79,31 @@ describe('scaffoldNovel', () => {
       scaffoldNovel({ novelsDir, templateId: 'template-novel', novelId: 'new-novel' }),
     ).toThrow('作品ディレクトリが既に存在する')
   })
+
+  it('新規作品IDにパス区切りが含まれていればエラーにする', () => {
+    const novelsDir = fixtureNovelsDir()
+
+    expect(() =>
+      scaffoldNovel({ novelsDir, templateId: 'template-novel', novelId: '../outside' }),
+    ).toThrow('新規作品IDが不正')
+    expect(existsSync(join(novelsDir, '..', 'outside'))).toBe(false)
+  })
+
+  it('雛形IDにパス区切りが含まれていればエラーにする', () => {
+    const novelsDir = fixtureNovelsDir()
+
+    expect(() =>
+      scaffoldNovel({ novelsDir, templateId: '../outside', novelId: 'new-novel' }),
+    ).toThrow('雛形の作品IDが不正')
+  })
+
+  it('雛形の main.ts に novelId が無ければ、対象ディレクトリを作らずにエラーにする', () => {
+    const novelsDir = fixtureNovelsDir()
+    writeFileSync(join(novelsDir, 'template-novel', 'main.ts'), "console.log('novelId 指定なし')\n")
+
+    expect(() =>
+      scaffoldNovel({ novelsDir, templateId: 'template-novel', novelId: 'new-novel' }),
+    ).toThrow('雛形の main.ts に novelId の指定が見つからない')
+    expect(existsSync(join(novelsDir, 'new-novel'))).toBe(false)
+  })
 })
