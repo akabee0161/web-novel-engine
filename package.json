@@ -20,6 +20,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "gen:assets": "node tools/gen-dummy-assets.mjs novels/kieta-ippen/public",
+    "scaffold:novel": "node tools/scaffold-novel/index.ts",
+    "wn:validate": "node tools/wn-compile/validate.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
