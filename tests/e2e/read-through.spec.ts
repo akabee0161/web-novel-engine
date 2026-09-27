@@ -499,6 +499,22 @@ test('開発用の ?scene=&index= で途中から始められる', async ({ page
   expect(await readSprites(page)).not.toEqual([])
 })
 
+test('fade を省いた @bg は、後続の @flashback の尺でフェードし直さない', async ({ page }) => {
+  // 廊下の最終ブロックから、通常再生で「@bg clubroom_day」（fade なし）→「@flashback on」へ進む。
+  // リプレイで背景を切り替えると再現しないので、切り替えはクリックで通常再生させる
+  await page.goto('/?scene=' + encodeURIComponent('廊下') + '&index=9')
+  await page.getByRole('button', { name: 'はじめから' }).click()
+  await settle(page)
+  expect(await body(page).textContent()).toBe('なのに、内容が一行も出てこない。')
+
+  await tap(page)
+  await settle(page)
+  expect(await body(page).textContent()).toBe('──昨日。')
+  await expect(bgLayer(page)).toHaveAttribute('data-bg', 'clubroom_day')
+  // 背景の CSS animation は、途中で duration が変わると終わったフェードをやり直す
+  expect(await bgLayer(page).evaluate((el) => el.style.animationDuration)).toBe('0ms')
+})
+
 test('存在しないシーンを指定したら、黙って先頭から始めずに失敗として出る', async ({ page }) => {
   const dialogs: string[] = []
   page.on('dialog', (d) => { dialogs.push(d.message()); void d.dismiss() })

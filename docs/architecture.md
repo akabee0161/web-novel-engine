@@ -143,7 +143,8 @@ type EngineState = {
     visibleChars: number
     pageBreaks: number[]         // ページ先頭の文字位置。UI が測定して渡す
     page: { current: number; total: number }
-    fadeMs: number
+    fadeMs: number               // 進行中の演出の待ち時間。@bg / @wait / @flashback が書き換える
+    bgFadeMs: number             // 今の背景のフェードの尺。@bg だけが書き換える
     backlog: BacklogEntry[]
   }
 }
@@ -211,8 +212,14 @@ case 'bg':
 ```
 
 ```tsx
-<div style={{ transitionDuration: `${state.view.fadeMs}ms` }} />
+<div key={bg} style={{ animationDuration: `${state.view.bgFadeMs}ms` }} />
 ```
+
+**背景の尺は `fadeMs` ではなく `bgFadeMs` から取る。** CSS animation は途中で
+`animation-duration` が変わると、終わったフェードをやり直す。`fadeMs` は後続の
+`@wait` / `@flashback` でも書き換わるため、これを渡すと `fade` なしの `@bg` の直後に
+`@flashback on` が来たとき、背景が 600ms かけてフェードし直す。
+リプレイで切り替えた背景は `bgFadeMs = 0` で、復元した画面にフェードなしで出る。
 
 **`transitionend` で演出完了を判定しない。**
 

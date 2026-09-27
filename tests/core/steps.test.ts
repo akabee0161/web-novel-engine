@@ -38,6 +38,49 @@ describe('@bg', () => {
     await vi.waitFor(() => expect(r.getState().view.phase).toBe('waiting'), { timeout: 2000 })
   })
 
+  it('fade を省いた @bg は、直前の演出の尺を背景のフェードに持ち込まない', async () => {
+    const r = runtimeOf([
+      { t: 'bg', name: 'x', fade: 50 },
+      { t: 'bg', name: 'y', fade: 0 },
+    ])
+    await runToWait(r)
+    expect(r.getState().view.bgFadeMs).toBe(0)
+  })
+
+  it('背景のフェードの尺は、後続の @wait / @flashback で書き換わらない', async () => {
+    // CSS animation は途中で duration が変わると、終わったフェードをやり直すため
+    const r = runtimeOf([
+      { t: 'bg', name: 'x', fade: 0 },
+      { t: 'flashback', on: true },
+      { t: 'wait', ms: 50 },
+    ])
+    await runToWait(r)
+    expect(r.getState().view.bgFadeMs).toBe(0)
+  })
+
+  it('リプレイで切り替えた背景は、フェードせずに復元される', async () => {
+    const r = new Runtime({
+      novelId: 't', baseUrl: 'https://x.test/',
+      script: {
+        title: 't', protagonist: null, assets: {},
+        scenes: [{
+          id: 'A',
+          steps: [
+            { t: 'text', i: 0, h: 'a', speaker: null, body: 'a' },
+            { t: 'bg', name: 'x', fade: 800 },
+            { t: 'text', i: 1, h: 'b', speaker: null, body: 'b' },
+          ],
+        }],
+      },
+    })
+    r.setSettings({ ...DEFAULT_SETTINGS, textMode: 'instant' })
+    const initial = r.getState().snapshot
+    void r.load({ scene: 'A', snapshot: initial, index: 1 })
+    await vi.waitFor(() => expect(r.getState().view.phase).toBe('waiting'), { timeout: 2000 })
+    expect(r.getState().snapshot.bg).toBe('x')
+    expect(r.getState().view.bgFadeMs).toBe(0)
+  })
+
   it('背景はシーンをまたいで持ち越される', async () => {
     const r = new Runtime({
       novelId: 't', baseUrl: 'https://x.test/',
