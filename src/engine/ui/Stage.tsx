@@ -7,7 +7,7 @@ type Props = { runtime: Runtime; state: EngineState }
 /** 背景・立ち絵・回想オーバーレイを描く唯一の場所 */
 export function Stage({ runtime, state }: Props) {
   const bg = state.snapshot.bg
-  const fadeMs = state.view.fadeMs
+  const fadeMs = state.view.bgFadeMs
 
   // 直前の背景を覚えておき、下に敷いたままクロスフェードする。
   // レンダー中の ref 書き換えだが、bg が変わったときだけの冪等な操作なので二重レンダーでも壊れない。

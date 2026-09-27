@@ -35,8 +35,13 @@ export type EngineState = {
     /** ページの先頭文字位置。[0] は常に 0。UI が測定して渡す */
     pageBreaks: number[]
     page: { current: number; total: number }
-    /** 進行中の演出の所要時間。CSS の transition-duration に渡す */
+    /** 進行中の演出の待ち時間。@bg / @wait / @flashback のたびに書き換わる */
     fadeMs: number
+    /**
+     * 今の背景のフェードの尺。@bg だけが書き換える。背景の CSS animation はこちらを使う。
+     * fadeMs を使うと、後続の @wait などで duration が変わり、終わったフェードがやり直される
+     */
+    bgFadeMs: number
     backlog: BacklogEntry[]
   }
 }
@@ -57,6 +62,7 @@ export function initialState(sceneId: string): EngineState {
       pageBreaks: [0],
       page: { current: 0, total: 1 },
       fadeMs: 0,
+      bgFadeMs: 0,
       backlog: [],
     },
   }

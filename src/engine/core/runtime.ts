@@ -350,9 +350,11 @@ export class Runtime {
         await this.execText(step)
         break
       case 'bg':
-        // 状態を先に更新してから待つ。UI は新しい背景を fadeMs 付きで描き始め、
+        // 状態を先に更新してから待つ。UI は新しい背景を bgFadeMs 付きで描き始め、
         // コアはその時間だけ止まる。transitionend は見ない
         this.state.snapshot.bg = step.name
+        // リプレイで切り替えた背景は、復元した画面にフェードなしで出す
+        this.state.view.bgFadeMs = this.replaying ? 0 : step.fade
         this.emit()
         await this.perform(step.fade)
         break
@@ -525,7 +527,7 @@ export class Runtime {
   }
 
   /**
-   * 演出の待ち。時間の権威はここにあり、CSS は view.fadeMs を受け取るだけ。
+   * 演出の待ち。時間の権威はここにあり、CSS は尺を view から受け取るだけ。
    * リプレイ中は待たない（これがリプレイ専用分岐の2つ目）。
    *
    * transitionend は使わない。発火が保証されず、描画を伴わないリプレイでも検知できないため。
