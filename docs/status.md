@@ -74,7 +74,8 @@ UI が Range API で測って境界をコアに渡し、ページに分かれて
 - [2026-08-08 の決定](decisions/2026-08-08-asset-location-and-verification.md)の申し送りは
   **4件すべて実装済み**
 - `novel-to-wn` スキルを実際の2作目原稿で試す（`/novel-to-wn <原稿パス> <作品ID>`）。
-  実地検証はまだ
+  実地検証はまだ。**原稿は利用者が用意する。** 進み具合は
+  [Issue #4](https://github.com/akabee0161/web-novel-engine/issues/4) を見る
 
 残っている確認は**実機**（iOS Safari）での通読と実聴。デバイスモードでは確認済み。
 
