@@ -7,3 +7,8 @@ playwright-report/
 
 # 計画実行の作業記録（進捗台帳・レビュー用の差分）。履歴に残すのはコミットのほう
 .superpowers/
+
+# 作品は作品リポジトリで管理する。ここで書いている作品はコミットしない。
+# 追跡するのは動作確認用の kieta-ippen だけ（docs/architecture.md の「リポジトリ構成」）
+novels/*
+!novels/kieta-ippen/

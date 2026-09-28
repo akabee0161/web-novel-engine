@@ -5,6 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ブラウザで動くサウンドノベル / ビジュアルノベルエンジン。台本（`.wn`）をビルド時に JSON へ
 コンパイルし、React 非依存のコアが実行する。作品は `novels/<作品ID>/` に1つずつ置く。
 
+**このリポジトリはエンジンの正本。** 作品は最終的に、このリポジトリをエンジンごとコピーした
+作品リポジトリで作る。コミットする作品は動作確認用の `novels/kieta-ippen/` だけ。
+エンジンを作り込んでいる間は `novels/` に作品を置いて試してよいが、`.gitignore` で外れているので
+コミットされない（`git add -f` で足さないこと）。詳細は `docs/architecture.md` の「リポジトリ構成」。
+
 ## 最初に読む
 
 | 迷ったとき | 見る場所 |
